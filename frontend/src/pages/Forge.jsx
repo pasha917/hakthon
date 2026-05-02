@@ -66,7 +66,7 @@ export default function Forge({ sessionId, brand, domain, onBack, onOpenPitchPra
 
 /* ---------- LOGO STUDIO ---------- */
 function LogoStudio({ sessionId, brand }) {
-  const [name, setName] = useState(brand || "BubbleStack");
+  const [name, setName] = useState(brand || "Cofoundry");
   const [style, setStyle] = useState("modern, luxurious, minimal, premium");
   const [palette, setPalette] = useState("deep navy, gold, ivory accents");
   const [loading, setLoading] = useState(false);

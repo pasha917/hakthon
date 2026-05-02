@@ -1,5 +1,5 @@
 """
-Authentication & email OTP for BubblePilot.
+Authentication & email OTP for Cofoundry.
 JWT (Bearer) based. Custom email/password + OTP-via-Gmail-SMTP forgot password.
 """
 from fastapi import APIRouter, HTTPException, Depends, Request
@@ -84,11 +84,11 @@ def _send_otp_email_sync(to_email: str, otp: str):
     port = int(os.environ.get("SMTP_PORT", "587"))
     user = os.environ.get("SMTP_USER")
     password = os.environ.get("SMTP_PASS")
-    from_name = os.environ.get("SMTP_FROM_NAME", "BubblePilot")
+    from_name = os.environ.get("SMTP_FROM_NAME", "Cofoundry")
     if not user or not password:
         raise RuntimeError("SMTP credentials missing")
 
-    subj = "Your BubblePilot password reset code"
+    subj = "Your Cofoundry password reset code"
     html = f"""
     <html><body style="margin:0;padding:0;background:#0b0b14;font-family:Arial,sans-serif;color:#f4efe2">
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:40px 20px">
@@ -96,7 +96,7 @@ def _send_otp_email_sync(to_email: str, otp: str):
           <table role="presentation" width="540" cellspacing="0" cellpadding="0"
             style="background:linear-gradient(135deg,#13131e,#0b0b14);border:1px solid #2a2a3a;border-radius:24px;padding:40px;box-shadow:0 20px 60px rgba(0,0,0,.5)">
             <tr><td>
-              <div style="font-size:11px;letter-spacing:3px;color:#e6c870;text-transform:uppercase;font-weight:700">BubblePilot</div>
+              <div style="font-size:11px;letter-spacing:3px;color:#e6c870;text-transform:uppercase;font-weight:700">Cofoundry</div>
               <h1 style="font-size:28px;color:#fff;margin:8px 0 4px">Your reset code</h1>
               <p style="color:#aaa9b6;margin:0 0 28px">Use this 6-digit code to reset your password. It expires in 10 minutes.</p>
               <div style="background:rgba(230,200,112,.1);border:1px solid rgba(230,200,112,.35);border-radius:18px;padding:28px;text-align:center">
@@ -114,7 +114,7 @@ def _send_otp_email_sync(to_email: str, otp: str):
     msg["Subject"] = subj
     msg["From"] = f"{from_name} <{user}>"
     msg["To"] = to_email
-    msg.attach(MIMEText(f"Your BubblePilot reset code is {otp}. It expires in 10 minutes.", "plain"))
+    msg.attach(MIMEText(f"Your Cofoundry reset code is {otp}. It expires in 10 minutes.", "plain"))
     msg.attach(MIMEText(html, "html"))
 
     server = smtplib.SMTP(host, port, timeout=20)

@@ -28,6 +28,8 @@ export default function VoiceCallModal({ open, onClose, sessionId, mode = "advis
   const silenceStartRef = useRef(0);
   const audioElRef = useRef(null);
 
+  const [detectedLang, setDetectedLang] = useState(null);
+
   const endpointChat = mode === "pitch" ? "/pitch-practice" : "/voice-chat";
 
   const cleanup = useCallback(() => {
@@ -81,6 +83,7 @@ export default function VoiceCallModal({ open, onClose, sessionId, mode = "advis
       const res = await axios.post(`${API}${endpointChat}`, {
         session_id: sessionId || localStorage.getItem("advisor_session_id"),
         message: text,
+        language: detectedLang || undefined,
         persona: mode === "pitch" ? "tough" : undefined,
       }, { timeout: 60000 });
       const reply = (res.data?.reply || "Sorry, I didn't catch that.").trim();
@@ -104,6 +107,8 @@ export default function VoiceCallModal({ open, onClose, sessionId, mode = "advis
       fd.append("audio", blob, "speech.webm");
       const res = await axios.post(`${API}/stt`, fd, { timeout: 30000, headers: { "Content-Type": "multipart/form-data" } });
       const text = (res.data?.text || "").trim();
+      const lang = (res.data?.language || "").toLowerCase();
+      if (lang) setDetectedLang(lang);
       setUserText(text);
       if (!text) {
         if (callActiveRef.current) startRecording();

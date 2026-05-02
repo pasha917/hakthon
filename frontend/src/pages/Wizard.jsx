@@ -9,7 +9,7 @@ import Step3Analysis from "@/pages/steps/Step3Analysis";
 import Step4Support from "@/pages/steps/Step4Support";
 import Step5Verdict from "@/pages/steps/Step5Verdict";
 import Forge from "@/pages/Forge";
-import VoiceCallModal, { VoiceCallButton } from "@/components/VoiceCallModal";
+import VoiceCallModal from "@/components/VoiceCallModal";
 import { useAuth } from "@/context/AuthContext";
 import { LogOut, User as UserIcon } from "lucide-react";
 
@@ -140,12 +140,11 @@ export default function Wizard() {
             <div className="absolute inset-1 rounded-full border border-amber-200/30" />
           </div>
           <div>
-            <div className="font-display font-bold text-xl text-white leading-none tracking-tight">BubblePilot</div>
+            <div className="font-display font-bold text-xl text-white leading-none tracking-tight">Cofoundry</div>
             <div className="text-[10px] tracking-[0.25em] uppercase text-amber-200/70 mt-1">AI Startup Atelier</div>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <VoiceCallButton onOpen={() => setVoiceCallOpen(true)} className="text-sm py-2 px-4" />
           {auth.ready && (
             auth.user ? (
               <div className="flex items-center gap-2" data-testid="user-pill">

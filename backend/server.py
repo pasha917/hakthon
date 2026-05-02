@@ -56,6 +56,7 @@ class VerdictRequest(BaseModel):
 class VoiceChatInput(BaseModel):
     session_id: Optional[str] = None
     message: str
+    language: Optional[str] = None
 
 
 # ================== HELPERS ==================
@@ -160,7 +161,7 @@ Return JSON with this exact schema:
   ]
 }}
 """
-    data = await _llm_json(system, user, session_id)
+    data = await _llm_json(system, user, session_id, model="claude-haiku-4-5-20251001")
     await _save_session(session_id, {"step1": {"idea": payload.idea, "result": data}})
     return {"session_id": session_id, **data}
 
@@ -195,7 +196,7 @@ Analyze deeply and return JSON with this exact schema:
 }}
 Return between 3 and 5 items for existing_players and what_to_learn.
 """
-    data = await _llm_json(system, user, payload.session_id)
+    data = await _llm_json(system, user, payload.session_id, model="claude-haiku-4-5-20251001")
     await _save_session(payload.session_id, {
         "step2": {"selected_problem": payload.selected_problem},
         "step3": {"refined_idea": payload.refined_idea, "result": data},
@@ -234,7 +235,7 @@ JSON schema:
   ]
 }}
 """
-    data = await _llm_json(system, user, payload.session_id)
+    data = await _llm_json(system, user, payload.session_id, model="claude-haiku-4-5-20251001")
     await _save_session(payload.session_id, {"step4": {"domain": payload.domain, "country": payload.country, "result": data}})
     return {"session_id": payload.session_id, **data}
 
@@ -326,11 +327,13 @@ async def voice_chat(payload: VoiceChatInput):
         if doc:
             context = json.dumps({k: v for k, v in doc.items() if k.startswith("step")})[:6000]
     system = (
-        "You are Bubble — a warm, witty startup mentor having a real-time voice conversation. "
+        "You are Cofoundry — a warm, witty startup mentor having a real-time voice conversation. "
         "Sound like a thoughtful human friend, not a chatbot. Keep replies SHORT (1-3 sentences, ~25-50 words max). "
         "Ask one focused follow-up question when natural. Never use markdown, bullet points, lists, emojis, or special characters. "
-        "Speak in plain spoken English. Acknowledge what the user said before answering. "
-        "If you don't know something, admit it briefly and suggest how to find out."
+        "CRITICAL: Always respond in the SAME language and script the user is speaking. "
+        f"Detected language code: {payload.language or 'auto'}. "
+        "If unsure, mirror the user's last message language exactly. Speak in plain spoken form. "
+        "Acknowledge what the user said before answering."
     )
     user = f"User said: {payload.message}\n\nContext (may be empty):\n{context}"
     if not EMERGENT_LLM_KEY:
@@ -339,7 +342,7 @@ async def voice_chat(payload: VoiceChatInput):
         api_key=EMERGENT_LLM_KEY,
         session_id=session_id,
         system_message=system,
-    ).with_model(LLM_PROVIDER, LLM_MODEL)
+    ).with_model(LLM_PROVIDER, "claude-haiku-4-5-20251001")
     try:
         reply = await chat.send_message(UserMessage(text=user))
     except Exception as e:
@@ -368,9 +371,11 @@ async def speech_to_text(audio: UploadFile = File(...)):
         # Whisper expects a file-like with a name + content_type for proper handling
         buf = io.BytesIO(data)
         buf.name = audio.filename or "audio.webm"
-        resp = await stt.transcribe(file=buf, model="whisper-1", response_format="json", language="en")
+        resp = await stt.transcribe(file=buf, model="whisper-1", response_format="verbose_json")
         text = getattr(resp, "text", None) or (resp.get("text") if isinstance(resp, dict) else "") or ""
-        return {"text": text.strip()}
+        # Whisper auto-detects language; surface it to the caller for downstream prompts
+        lang = getattr(resp, "language", None) or (resp.get("language") if isinstance(resp, dict) else None) or "en"
+        return {"text": text.strip(), "language": lang}
     except HTTPException:
         raise
     except Exception as e:

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, ArrowRight, Loader2, Phone } from "lucide-react";
+import { Sparkles, ArrowRight, Loader2 } from "lucide-react";
 import SpeechButton from "@/components/SpeechButton";
 import RevealText from "@/components/RevealText";
+import RobotAvatar from "@/components/RobotAvatar";
 
 const SAMPLES = [
   "An app that helps small farmers predict rainfall using cheap sensors",
@@ -95,44 +96,28 @@ export default function Step1Idea({ onSubmit, loading, initial, onOpenVoiceCall 
             <span className="relative z-10">{loading ? "Brewing insights…" : "Reveal my dossier"}</span>
             {!loading && <ArrowRight size={18} className="relative z-10" />}
           </button>
-          <button
-            onClick={onOpenVoiceCall}
-            type="button"
-            className="lux-btn lux-btn-violet"
-            data-testid="step1-voice-call-btn"
-          >
-            <Phone size={18} className="relative z-10" />
-            <span className="relative z-10">Talk to Bubble</span>
-          </button>
-          <span className="text-sm t-mute">Takes ~15 seconds</span>
+          <span className="text-sm t-mute">Tap the robot to talk · any language</span>
         </motion.div>
       </div>
 
-      <div className="lg:col-span-2 hidden lg:flex justify-center">
+      <div className="lg:col-span-2 hidden lg:flex flex-col items-center justify-center">
         <motion.div
           initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.3 }}
-          className="relative w-[22rem] h-[22rem]"
-          aria-hidden
+          className="relative"
         >
-          <div className="absolute inset-0 rounded-full" style={{ background: "radial-gradient(circle, rgba(230,200,112,0.18) 0%, transparent 70%)" }} />
-          {/* Concentric rings */}
-          <div className="absolute inset-0 rounded-full border border-amber-300/15" />
-          <div className="absolute inset-6 rounded-full border border-amber-300/10" />
-          <div className="absolute inset-14 rounded-full border border-amber-300/5" />
-          <motion.div
-            className="absolute left-2 top-4 w-24 h-24 rounded-full glass flex items-center justify-center font-display font-semibold text-amber-200 italic"
-            animate={{ y: [0, -10, 0] }} transition={{ repeat: Infinity, duration: 4 }}
-          >Seed</motion.div>
-          <motion.div
-            className="absolute right-2 top-20 w-28 h-28 rounded-full glass flex items-center justify-center font-display font-semibold text-rose-200 italic"
-            animate={{ y: [0, 12, 0] }} transition={{ repeat: Infinity, duration: 5, delay: 0.4 }}
-          >Bloom</motion.div>
-          <motion.div
-            className="absolute left-20 bottom-2 w-36 h-36 rounded-full glass-heavy flex items-center justify-center font-display font-semibold text-emerald-200 text-xl italic"
-            animate={{ y: [0, -8, 0] }} transition={{ repeat: Infinity, duration: 6, delay: 0.8 }}
-          >Launch</motion.div>
+          <RobotAvatar
+            state="idle"
+            size={300}
+            onClick={onOpenVoiceCall}
+            label="Talk to your AI co-founder"
+          />
         </motion.div>
+        <div className="mt-6 text-center">
+          <div className="text-[10px] tracking-[0.25em] uppercase font-bold text-amber-200/80">Your AI co-founder</div>
+          <div className="font-display font-semibold text-2xl text-white mt-1 italic">Tap me. Speak any language.</div>
+          <div className="text-sm t-soft mt-2 max-w-xs">I'll listen, understand, and reply in your language — Hindi, English, Tamil, Telugu, Spanish & more.</div>
+        </div>
       </div>
     </div>
   );
