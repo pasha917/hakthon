@@ -102,27 +102,48 @@ export default function ValidationLab({ sessionId, domain, onBack }) {
 function useAITool(endpoint, sessionId) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const run = async (extra = {}) => {
     setLoading(true);
-    try {
-      const res = await axios.post(`${API}${endpoint}`, { session_id: sessionId, ...extra }, { timeout: 60000 });
-      setData(res.data);
-    } catch (e) { toast.error("AI generation failed"); }
-    finally { setLoading(false); }
+    setError(null);
+    let lastErr = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await axios.post(
+          `${API}${endpoint}`,
+          { session_id: sessionId, ...extra },
+          { timeout: 90000 }
+        );
+        setData(res.data);
+        setLoading(false);
+        return;
+      } catch (e) {
+        lastErr = e;
+        // Retry once on network/timeout/502/504; don't retry on 4xx
+        const status = e?.response?.status;
+        if (status && status < 500 && status !== 408) break;
+      }
+    }
+    const detail = lastErr?.response?.data?.detail || lastErr?.message || "Unknown error";
+    const msg = typeof detail === "string" ? detail : "AI generation failed";
+    setError(msg);
+    toast.error(msg.slice(0, 140));
+    setLoading(false);
   };
-  return { data, loading, run };
+  return { data, loading, error, run };
 }
 
-function ToolHeader({ title, subtitle, onRun, loading, icon, ready }) {
+function ToolHeader({ title, subtitle, onRun, loading, icon, ready, error }) {
   return (
     <div className="glass p-6 mb-6 flex items-center justify-between flex-wrap gap-3" data-testid="tool-header">
       <div>
         <div className="font-display font-semibold text-2xl text-white flex items-center gap-2">{icon}{title}</div>
         <p className="t-soft text-sm mt-1 max-w-xl">{subtitle}</p>
+        {error && <div className="text-rose-300 text-sm mt-2">⚠ {error.slice(0, 200)} — tap Retry.</div>}
       </div>
       <button onClick={onRun} disabled={loading} className="lux-btn lux-btn-primary" data-testid="tool-run">
         {loading ? <Loader2 className="animate-spin" size={18} /> : <Wand2 size={18} />}
-        <span className="relative z-10">{loading ? "Analyzing…" : ready ? "Regenerate" : "Run analysis"}</span>
+        <span className="relative z-10">{loading ? "Analyzing…" : error ? "Retry" : ready ? "Regenerate" : "Run analysis"}</span>
       </button>
     </div>
   );
@@ -130,7 +151,7 @@ function ToolHeader({ title, subtitle, onRun, loading, icon, ready }) {
 
 /* ---------- 1. SCORECARD ---------- */
 function Scorecard({ sessionId }) {
-  const { data, loading, run } = useAITool("/validation/scorecard", sessionId);
+  const { data, loading, error, run } = useAITool("/validation/scorecard", sessionId);
   const tierColor = {
     Diamond: "text-cyan-300", Gold: "text-amber-300", Silver: "text-slate-300",
     Bronze: "text-orange-300", "Re-validate": "text-rose-300",
@@ -140,7 +161,7 @@ function Scorecard({ sessionId }) {
     : "from-rose-300 via-rose-500 to-rose-700";
   return (
     <div data-testid="scorecard-view">
-      <ToolHeader title="Validation Scorecard" subtitle="100-point master scorecard tying every signal together — strengths, gaps, and the go/no-go call." onRun={run} loading={loading} icon={<Trophy size={20} className="text-amber-300" />} ready={!!data} />
+      <ToolHeader title="Validation Scorecard" subtitle="100-point master scorecard tying every signal together — strengths, gaps, and the go/no-go call." onRun={run} loading={loading} icon={<Trophy size={20} className="text-amber-300" />} ready={!!data} error={error} />
       {!data && !loading && <div className="glass p-8 t-soft text-center">Click Run to score your idea across 8 categories.</div>}
       {data && (
         <>
@@ -198,10 +219,10 @@ function Scorecard({ sessionId }) {
 
 /* ---------- 2. MARKET SIZING ---------- */
 function MarketSizing({ sessionId }) {
-  const { data, loading, run } = useAITool("/validation/market-sizing", sessionId);
+  const { data, loading, error, run } = useAITool("/validation/market-sizing", sessionId);
   return (
     <div data-testid="market-view">
-      <ToolHeader title="Market Sizing — TAM / SAM / SOM" subtitle="Realistic top-down + bottom-up market estimate with assumptions and verifiable data sources." onRun={run} loading={loading} icon={<Globe2 size={20} className="text-amber-300" />} ready={!!data} />
+      <ToolHeader title="Market Sizing — TAM / SAM / SOM" subtitle="Realistic top-down + bottom-up market estimate with assumptions and verifiable data sources." onRun={run} loading={loading} icon={<Globe2 size={20} className="text-amber-300" />} ready={!!data} error={error} />
       {!data && !loading && <div className="glass p-8 t-soft text-center">Click Run to compute your market.</div>}
       {data && (
         <>
@@ -233,11 +254,11 @@ function MarketSizing({ sessionId }) {
 
 /* ---------- 3. COMPETITOR MATRIX ---------- */
 function CompetitorMatrix({ sessionId }) {
-  const { data, loading, run } = useAITool("/validation/competitor-matrix", sessionId);
+  const { data, loading, error, run } = useAITool("/validation/competitor-matrix", sessionId);
   const renderStars = (n) => "★".repeat(n) + "☆".repeat(5 - n);
   return (
     <div data-testid="competitor-view">
-      <ToolHeader title="Competitor Benchmark Matrix" subtitle="Score 4 real competitors across 6 axes; see saturation and your edge at a glance." onRun={run} loading={loading} icon={<Swords size={20} className="text-amber-300" />} ready={!!data} />
+      <ToolHeader title="Competitor Benchmark Matrix" subtitle="Score 4 real competitors across 6 axes; see saturation and your edge at a glance." onRun={run} loading={loading} icon={<Swords size={20} className="text-amber-300" />} ready={!!data} error={error} />
       {!data && !loading && <div className="glass p-8 t-soft text-center">Click Run to benchmark the field.</div>}
       {data && (
         <>
@@ -282,7 +303,7 @@ function CompetitorMatrix({ sessionId }) {
 
 /* ---------- 4. SURVEY ---------- */
 function Survey({ sessionId }) {
-  const { data, loading, run } = useAITool("/validation/survey", sessionId);
+  const { data, loading, error, run } = useAITool("/validation/survey", sessionId);
   const exportTxt = () => {
     if (!data) return;
     const txt = `${data.title}\n\n${data.intro}\n\n` + (data.questions || []).map(q => `${q.n}. ${q.q}${q.options?.length ? "\n   " + q.options.join(" / ") : ""}`).join("\n\n");
@@ -291,7 +312,7 @@ function Survey({ sessionId }) {
   };
   return (
     <div data-testid="survey-view">
-      <ToolHeader title="Customer Validation Survey" subtitle="12 Mom-Test questions to test demand with real users — past behavior, not opinions." onRun={run} loading={loading} icon={<ClipboardList size={20} className="text-amber-300" />} ready={!!data} />
+      <ToolHeader title="Customer Validation Survey" subtitle="12 Mom-Test questions to test demand with real users — past behavior, not opinions." onRun={run} loading={loading} icon={<ClipboardList size={20} className="text-amber-300" />} ready={!!data} error={error} />
       {!data && !loading && <div className="glass p-8 t-soft text-center">Click Run to draft your survey.</div>}
       {data && (
         <>
@@ -323,10 +344,10 @@ function Survey({ sessionId }) {
 
 /* ---------- 5. LANDING COPY ---------- */
 function LandingCopy({ sessionId }) {
-  const { data, loading, run } = useAITool("/validation/landing-copy", sessionId);
+  const { data, loading, error, run } = useAITool("/validation/landing-copy", sessionId);
   return (
     <div data-testid="landing-view">
-      <ToolHeader title="Landing Page Copy + A/B Variants" subtitle="3 hook angles you can ship today to test demand." onRun={run} loading={loading} icon={<LayoutTemplate size={20} className="text-amber-300" />} ready={!!data} />
+      <ToolHeader title="Landing Page Copy + A/B Variants" subtitle="3 hook angles you can ship today to test demand." onRun={run} loading={loading} icon={<LayoutTemplate size={20} className="text-amber-300" />} ready={!!data} error={error} />
       {!data && !loading && <div className="glass p-8 t-soft text-center">Click Run to draft your headlines.</div>}
       {data && (
         <>
@@ -352,10 +373,10 @@ function LandingCopy({ sessionId }) {
 
 /* ---------- 6. FINANCIALS ---------- */
 function Financials({ sessionId }) {
-  const { data, loading, run } = useAITool("/validation/financials", sessionId);
+  const { data, loading, error, run } = useAITool("/validation/financials", sessionId);
   return (
     <div data-testid="financials-view">
-      <ToolHeader title="5-Year P&L & Unit Economics" subtitle="Revenue, EBITDA, break-even month, CAC/LTV — realistic for early-stage." onRun={run} loading={loading} icon={<Wallet size={20} className="text-amber-300" />} ready={!!data} />
+      <ToolHeader title="5-Year P&L & Unit Economics" subtitle="Revenue, EBITDA, break-even month, CAC/LTV — realistic for early-stage." onRun={run} loading={loading} icon={<Wallet size={20} className="text-amber-300" />} ready={!!data} error={error} />
       {!data && !loading && <div className="glass p-8 t-soft text-center">Click Run to project the numbers.</div>}
       {data && (
         <>
@@ -405,10 +426,10 @@ function Financials({ sessionId }) {
 
 /* ---------- 7. PRICING ---------- */
 function Pricing({ sessionId }) {
-  const { data, loading, run } = useAITool("/validation/pricing", sessionId);
+  const { data, loading, error, run } = useAITool("/validation/pricing", sessionId);
   return (
     <div data-testid="pricing-view">
-      <ToolHeader title="Pricing Strategy" subtitle="3-tier structure with anchor pricing and expected paid conversion." onRun={run} loading={loading} icon={<Tag size={20} className="text-amber-300" />} ready={!!data} />
+      <ToolHeader title="Pricing Strategy" subtitle="3-tier structure with anchor pricing and expected paid conversion." onRun={run} loading={loading} icon={<Tag size={20} className="text-amber-300" />} ready={!!data} error={error} />
       {!data && !loading && <div className="glass p-8 t-soft text-center">Click Run to design your pricing.</div>}
       {data && (
         <>
@@ -451,11 +472,11 @@ function Pricing({ sessionId }) {
 
 /* ---------- 8. FEATURE PRIORITIES (RICE) ---------- */
 function FeaturePriority({ sessionId }) {
-  const { data, loading, run } = useAITool("/validation/feature-priority", sessionId);
+  const { data, loading, error, run } = useAITool("/validation/feature-priority", sessionId);
   const catColor = (c) => ({ Must: "text-rose-300 border-rose-400/40", Should: "text-amber-200 border-amber-300/40", Could: "text-sky-300 border-sky-400/40", Wont: "text-white/40 border-white/15" }[c] || "");
   return (
     <div data-testid="features-view">
-      <ToolHeader title="MVP Feature Prioritizer (RICE)" subtitle="Reach × Impact × Confidence ÷ Effort — 10 features ranked." onRun={run} loading={loading} icon={<ListChecks size={20} className="text-amber-300" />} ready={!!data} />
+      <ToolHeader title="MVP Feature Prioritizer (RICE)" subtitle="Reach × Impact × Confidence ÷ Effort — 10 features ranked." onRun={run} loading={loading} icon={<ListChecks size={20} className="text-amber-300" />} ready={!!data} error={error} />
       {!data && !loading && <div className="glass p-8 t-soft text-center">Click Run to score & rank features.</div>}
       {data && (
         <div className="overflow-x-auto glass p-3">
@@ -481,11 +502,11 @@ function FeaturePriority({ sessionId }) {
 
 /* ---------- 9. RISK HEATMAP ---------- */
 function RiskMap({ sessionId }) {
-  const { data, loading, run } = useAITool("/validation/risk-heatmap", sessionId);
+  const { data, loading, error, run } = useAITool("/validation/risk-heatmap", sessionId);
   const fill = (sev) => sev >= 16 ? "#FB7185" : sev >= 9 ? "#F59E0B" : sev >= 4 ? "#FBBF24" : "#34D399";
   return (
     <div data-testid="risks-view">
-      <ToolHeader title="Risk Heat-Map" subtitle="Likelihood × impact for 8 specific risks. Tap each for early signals + mitigation." onRun={run} loading={loading} icon={<ShieldAlert size={20} className="text-amber-300" />} ready={!!data} />
+      <ToolHeader title="Risk Heat-Map" subtitle="Likelihood × impact for 8 specific risks. Tap each for early signals + mitigation." onRun={run} loading={loading} icon={<ShieldAlert size={20} className="text-amber-300" />} ready={!!data} error={error} />
       {!data && !loading && <div className="glass p-8 t-soft text-center">Click Run to map risks.</div>}
       {data && (
         <>
@@ -521,10 +542,10 @@ function RiskMap({ sessionId }) {
 
 /* ---------- 10. INVESTOR MATCH ---------- */
 function Investors({ sessionId }) {
-  const { data, loading, run } = useAITool("/validation/investor-match", sessionId);
+  const { data, loading, error, run } = useAITool("/validation/investor-match", sessionId);
   return (
     <div data-testid="investors-view">
-      <ToolHeader title="Investor Match" subtitle="6 real funds whose thesis matches you — with check size, portfolio examples, and outreach tips." onRun={run} loading={loading} icon={<Handshake size={20} className="text-amber-300" />} ready={!!data} />
+      <ToolHeader title="Investor Match" subtitle="6 real funds whose thesis matches you — with check size, portfolio examples, and outreach tips." onRun={run} loading={loading} icon={<Handshake size={20} className="text-amber-300" />} ready={!!data} error={error} />
       {!data && !loading && <div className="glass p-8 t-soft text-center">Click Run to find investor fits.</div>}
       {data && (
         <div className="grid md:grid-cols-2 gap-5">
@@ -562,11 +583,11 @@ function Stat({ label, value }) {
 
 /* ---------- 11. IDEA QUALITY INSPECTOR ---------- */
 function IdeaQuality({ sessionId }) {
-  const { data, loading, run } = useAITool("/validation/idea-quality", sessionId);
+  const { data, loading, error, run } = useAITool("/validation/idea-quality", sessionId);
   const tone = (s) => s >= 75 ? "text-emerald-300" : s >= 50 ? "text-amber-300" : "text-rose-300";
   return (
     <div data-testid="quality-view">
-      <ToolHeader title="Idea Quality Inspector" subtitle="Microscope on your raw idea — clarity, scope, feasibility & originality scores + smell-fix list." onRun={run} loading={loading} icon={<Microscope size={20} className="text-amber-300" />} ready={!!data} />
+      <ToolHeader title="Idea Quality Inspector" subtitle="Microscope on your raw idea — clarity, scope, feasibility & originality scores + smell-fix list." onRun={run} loading={loading} icon={<Microscope size={20} className="text-amber-300" />} ready={!!data} error={error} />
       {!data && !loading && <div className="glass p-8 t-soft text-center">Click Run to inspect your idea quality.</div>}
       {data && (
         <>
@@ -613,7 +634,7 @@ function IdeaQuality({ sessionId }) {
 
 /* ---------- 12. SWOT ---------- */
 function SWOT({ sessionId }) {
-  const { data, loading, run } = useAITool("/validation/swot", sessionId);
+  const { data, loading, error, run } = useAITool("/validation/swot", sessionId);
   const Quadrant = ({ title, items, color, testid }) => (
     <div className={`glass p-5 border-l-4 ${color}`} data-testid={testid}>
       <div className="font-display font-semibold text-lg text-white mb-2">{title}</div>
@@ -622,7 +643,7 @@ function SWOT({ sessionId }) {
   );
   return (
     <div data-testid="swot-view">
-      <ToolHeader title="SWOT Analysis" subtitle="Sharp 4-item-per-quadrant SWOT plus 90-day strategic priorities." onRun={run} loading={loading} icon={<Compass size={20} className="text-amber-300" />} ready={!!data} />
+      <ToolHeader title="SWOT Analysis" subtitle="Sharp 4-item-per-quadrant SWOT plus 90-day strategic priorities." onRun={run} loading={loading} icon={<Compass size={20} className="text-amber-300" />} ready={!!data} error={error} />
       {!data && !loading && <div className="glass p-8 t-soft text-center">Click Run to map your SWOT.</div>}
       {data && (
         <>
@@ -646,11 +667,11 @@ function SWOT({ sessionId }) {
 
 /* ---------- 13. TRENDS ---------- */
 function Trends({ sessionId }) {
-  const { data, loading, run } = useAITool("/validation/trends", sessionId);
+  const { data, loading, error, run } = useAITool("/validation/trends", sessionId);
   const trajColor = data?.demand_trajectory === "Rising" ? "text-emerald-300" : data?.demand_trajectory === "Declining" ? "text-rose-300" : "text-amber-300";
   return (
     <div data-testid="trends-view">
-      <ToolHeader title="Trend & Demand Signal" subtitle="Search keywords, 5-year trend index, social signals, and geographic hotspots." onRun={run} loading={loading} icon={<TrendingUp size={20} className="text-amber-300" />} ready={!!data} />
+      <ToolHeader title="Trend & Demand Signal" subtitle="Search keywords, 5-year trend index, social signals, and geographic hotspots." onRun={run} loading={loading} icon={<TrendingUp size={20} className="text-amber-300" />} ready={!!data} error={error} />
       {!data && !loading && <div className="glass p-8 t-soft text-center">Click Run to read the market signals.</div>}
       {data && (
         <>
