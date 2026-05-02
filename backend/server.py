@@ -734,13 +734,35 @@ Make them realistic and culturally specific to the domain.
 # ====================================================================
 
 def _ctx_for(session: dict, max_chars: int = 4500) -> str:
-    return json.dumps({
-        "domain": ((session.get("step1") or {}).get("result") or {}).get("domain"),
-        "selected_problem": (session.get("step2") or {}).get("selected_problem"),
-        "refined_idea": (session.get("step3") or {}).get("refined_idea"),
-        "analysis": (session.get("step3") or {}).get("result"),
-        "verdict": (session.get("step5") or {}).get("result"),
-    })[:max_chars]
+    """Build rich context, falling back to raw idea & step1 result when later steps are missing."""
+    s1 = session.get("step1") or {}
+    s1r = s1.get("result") or {}
+    s2 = session.get("step2") or {}
+    s3 = session.get("step3") or {}
+    s5 = session.get("step5") or {}
+    payload = {
+        "raw_idea": s1.get("idea"),
+        "domain": s1r.get("domain"),
+        "why_fit": s1r.get("why_fit"),
+        "tags": s1r.get("tags"),
+        "world_problems_surfaced": s1r.get("problems"),
+        "selected_problem": s2.get("selected_problem"),
+        "refined_idea": s3.get("refined_idea"),
+        "deep_analysis": s3.get("result"),
+        "verdict": s5.get("result"),
+    }
+    # Strip None values so the JSON is compact and the LLM isn't fed null fields
+    payload = {k: v for k, v in payload.items() if v is not None}
+    return json.dumps(payload, ensure_ascii=False)[:max_chars]
+
+
+# Shared instruction appended to every validation prompt so the LLM always produces
+# a usable output even when later wizard steps are missing.
+_VAL_FALLBACK = (
+    "If some context fields are missing, INFER plausible defaults from the raw idea text "
+    "and tag uncertain numbers as estimates in the relevant 'basis' / 'why' fields. "
+    "ALWAYS produce a complete JSON object — never return zeros or empty arrays."
+)
 
 
 class ValBase(BaseModel):
@@ -764,7 +786,7 @@ Return JSON:
   "data_sources":["3 reputable sources"]
 }}
 """
-    return {"session_id": payload.session_id, **(await _llm_json("Market analyst. JSON only.", user, payload.session_id, model="claude-haiku-4-5-20251001"))}
+    return {"session_id": payload.session_id, **(await _llm_json("Market analyst. JSON only. " + _VAL_FALLBACK, user, payload.session_id, model="claude-haiku-4-5-20251001"))}
 
 
 @api_router.post("/validation/competitor-matrix")
@@ -788,7 +810,7 @@ Return JSON:
 }}
 Exactly 4 competitors.
 """
-    return {"session_id": payload.session_id, **(await _llm_json("Competitive analyst. JSON only.", user, payload.session_id, model="claude-haiku-4-5-20251001"))}
+    return {"session_id": payload.session_id, **(await _llm_json("Competitive analyst. JSON only. " + _VAL_FALLBACK, user, payload.session_id, model="claude-haiku-4-5-20251001"))}
 
 
 @api_router.post("/validation/survey")
@@ -808,7 +830,7 @@ Return JSON:
   "distribution_channels":["3 specific places"]
 }}
 """
-    return {"session_id": payload.session_id, **(await _llm_json("UX researcher. JSON only.", user, payload.session_id, model="claude-haiku-4-5-20251001"))}
+    return {"session_id": payload.session_id, **(await _llm_json("UX researcher. JSON only. " + _VAL_FALLBACK, user, payload.session_id, model="claude-haiku-4-5-20251001"))}
 
 
 @api_router.post("/validation/landing-copy")
@@ -831,7 +853,7 @@ Return JSON:
 }}
 Exactly 3 variants.
 """
-    return {"session_id": payload.session_id, **(await _llm_json("Conversion copywriter. JSON only.", user, payload.session_id, model="claude-haiku-4-5-20251001"))}
+    return {"session_id": payload.session_id, **(await _llm_json("Conversion copywriter. JSON only. " + _VAL_FALLBACK, user, payload.session_id, model="claude-haiku-4-5-20251001"))}
 
 
 @api_router.post("/validation/financials")
@@ -853,7 +875,7 @@ Return JSON:
   "unit_economics":{{"cac_usd":int,"ltv_usd":int,"payback_months":int}}
 }}
 """
-    return {"session_id": payload.session_id, **(await _llm_json("Startup CFO. JSON only.", user, payload.session_id, model="claude-haiku-4-5-20251001"))}
+    return {"session_id": payload.session_id, **(await _llm_json("Startup CFO. JSON only. " + _VAL_FALLBACK, user, payload.session_id, model="claude-haiku-4-5-20251001"))}
 
 
 @api_router.post("/validation/pricing")
@@ -876,7 +898,7 @@ Return JSON:
   "rationale":"3-4 sentences"
 }}
 """
-    return {"session_id": payload.session_id, **(await _llm_json("Pricing strategist. JSON only.", user, payload.session_id, model="claude-haiku-4-5-20251001"))}
+    return {"session_id": payload.session_id, **(await _llm_json("Pricing strategist. JSON only. " + _VAL_FALLBACK, user, payload.session_id, model="claude-haiku-4-5-20251001"))}
 
 
 @api_router.post("/validation/feature-priority")
@@ -894,7 +916,7 @@ Return JSON:
 }}
 rice_score = (reach * impact * confidence/100) / effort_weeks. Sort desc. Exactly 10.
 """
-    return {"session_id": payload.session_id, **(await _llm_json("Product manager. JSON only.", user, payload.session_id, model="claude-haiku-4-5-20251001"))}
+    return {"session_id": payload.session_id, **(await _llm_json("Product manager. JSON only. " + _VAL_FALLBACK, user, payload.session_id, model="claude-haiku-4-5-20251001"))}
 
 
 @api_router.post("/validation/risk-heatmap")
@@ -912,7 +934,7 @@ Return JSON:
 }}
 severity = likelihood * impact. Exactly 8. Sort desc.
 """
-    return {"session_id": payload.session_id, **(await _llm_json("Risk analyst. JSON only.", user, payload.session_id, model="claude-haiku-4-5-20251001"))}
+    return {"session_id": payload.session_id, **(await _llm_json("Risk analyst. JSON only. " + _VAL_FALLBACK, user, payload.session_id, model="claude-haiku-4-5-20251001"))}
 
 
 @api_router.post("/validation/investor-match")
@@ -933,7 +955,7 @@ Mix global + India focused. Return JSON:
 }}
 Use only real, verifiable firms.
 """
-    return {"session_id": payload.session_id, **(await _llm_json("VC analyst. JSON only.", user, payload.session_id, model="claude-haiku-4-5-20251001"))}
+    return {"session_id": payload.session_id, **(await _llm_json("VC analyst. JSON only. " + _VAL_FALLBACK, user, payload.session_id, model="claude-haiku-4-5-20251001"))}
 
 
 @api_router.post("/validation/scorecard")
@@ -965,9 +987,81 @@ Return JSON:
 }}
 final_score = average of category scores (rounded int).
 """
-    data = await _llm_json("Senior YC partner. JSON only.", user, payload.session_id, model="claude-haiku-4-5-20251001")
+    data = await _llm_json("Senior YC partner. JSON only. " + _VAL_FALLBACK, user, payload.session_id, model="claude-haiku-4-5-20251001")
     await _save_session(payload.session_id, {"validation_scorecard": data})
     return {"session_id": payload.session_id, **data}
+
+
+# 11. Idea Quality Inspector — sanity check the raw idea
+@api_router.post("/validation/idea-quality")
+async def idea_quality(payload: ValBase):
+    s = await _get_session(payload.session_id)
+    user = f"""
+Context: {_ctx_for(s)}
+
+Inspect the user's RAW STARTUP IDEA for quality issues that founders make.
+Return JSON:
+{{
+  "clarity_score": 0-100,
+  "scope_score": 0-100,
+  "feasibility_score": 0-100,
+  "originality_score": 0-100,
+  "overall_score": 0-100,
+  "rating":"Crystal-clear|Promising|Foggy|Confused",
+  "smells":[
+    {{"issue":"Vague problem|Too broad|Too narrow|Solution-first|Buzzword soup|Untestable","quote":"the exact phrase that triggers this","fix":"specific rewrite suggestion"}}
+  ],
+  "rewrite":"A crisp 1-sentence rewrite of the idea in the format 'For [audience], we build [thing] that [outcome]'",
+  "missing_specifics":["3-4 things still unclear"],
+  "encouragement":"1 sentence honest pep-talk"
+}}
+List 2-5 smells.
+"""
+    return {"session_id": payload.session_id, **(await _llm_json("Idea coach. JSON only. " + _VAL_FALLBACK, user, payload.session_id, model="claude-haiku-4-5-20251001"))}
+
+
+# 12. SWOT Analysis
+@api_router.post("/validation/swot")
+async def swot(payload: ValBase):
+    s = await _get_session(payload.session_id)
+    user = f"""
+Context: {_ctx_for(s)}
+
+Run a sharp SWOT analysis (4 items per quadrant, max 12 words each).
+Return JSON:
+{{
+  "strengths":["..."],
+  "weaknesses":["..."],
+  "opportunities":["..."],
+  "threats":["..."],
+  "strategic_priorities":["3 actions the founder should take in next 90 days"]
+}}
+"""
+    return {"session_id": payload.session_id, **(await _llm_json("Strategy consultant. JSON only. " + _VAL_FALLBACK, user, payload.session_id, model="claude-haiku-4-5-20251001"))}
+
+
+# 13. Trend & Demand Signal
+@api_router.post("/validation/trends")
+async def trends(payload: ValBase):
+    s = await _get_session(payload.session_id)
+    user = f"""
+Context: {_ctx_for(s)}
+
+Analyze demand & trend signals for this idea. Return JSON:
+{{
+  "primary_keywords":["3-5 keywords a user would Google"],
+  "search_intent":"Informational|Commercial|Transactional|Mixed",
+  "demand_trajectory":"Rising|Stable|Declining",
+  "rising_subtopics":["3-5 hot subtopics"],
+  "trend_index_5y":[
+    {{"year":"2021","index":0-100}},{{"year":"2022","index":0-100}},{{"year":"2023","index":0-100}},{{"year":"2024","index":0-100}},{{"year":"2025","index":0-100}}
+  ],
+  "social_signals":{{"twitter_x":"1 line","reddit":"1 line","linkedin":"1 line","youtube":"1 line"}},
+  "geographic_hotspots":["3-5 countries/regions with strongest signal"],
+  "recommended_window":"Why now / why not now in 2 sentences"
+}}
+"""
+    return {"session_id": payload.session_id, **(await _llm_json("Trend analyst. JSON only. " + _VAL_FALLBACK, user, payload.session_id, model="claude-haiku-4-5-20251001"))}
 
 
 app.include_router(api_router)

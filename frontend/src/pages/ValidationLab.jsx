@@ -4,12 +4,13 @@ import { motion } from "framer-motion";
 import {
   ArrowLeft, Loader2, Sparkles, Trophy, Globe2, Swords, ClipboardList,
   LayoutTemplate, Wallet, Tag, ListChecks, ShieldAlert, Handshake, Wand2,
+  Microscope, Compass, TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   ResponsiveContainer, BarChart, Bar, Cell, XAxis, YAxis, Tooltip,
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-  AreaChart, Area, CartesianGrid, ScatterChart, Scatter, ZAxis,
+  AreaChart, Area, CartesianGrid, ScatterChart, Scatter, ZAxis, LineChart, Line,
 } from "recharts";
 import RevealText from "@/components/RevealText";
 
@@ -32,6 +33,9 @@ const tooltipStyle = {
 
 const TABS = [
   { id: "scorecard", label: "Scorecard", icon: <Trophy size={16} /> },
+  { id: "quality", label: "Idea Quality", icon: <Microscope size={16} /> },
+  { id: "swot", label: "SWOT", icon: <Compass size={16} /> },
+  { id: "trends", label: "Trends", icon: <TrendingUp size={16} /> },
   { id: "market", label: "Market Sizing", icon: <Globe2 size={16} /> },
   { id: "competitors", label: "Competitor Matrix", icon: <Swords size={16} /> },
   { id: "survey", label: "Customer Survey", icon: <ClipboardList size={16} /> },
@@ -71,6 +75,9 @@ export default function ValidationLab({ sessionId, domain, onBack }) {
 
       <div className="min-h-[300px]">
         {tab === "scorecard" && <Scorecard sessionId={sessionId} />}
+        {tab === "quality" && <IdeaQuality sessionId={sessionId} />}
+        {tab === "swot" && <SWOT sessionId={sessionId} />}
+        {tab === "trends" && <Trends sessionId={sessionId} />}
         {tab === "market" && <MarketSizing sessionId={sessionId} />}
         {tab === "competitors" && <CompetitorMatrix sessionId={sessionId} />}
         {tab === "survey" && <Survey sessionId={sessionId} />}
@@ -549,6 +556,146 @@ function Stat({ label, value }) {
     <div className="glass p-5">
       <div className="text-[10px] tracking-[0.2em] uppercase font-bold t-mute">{label}</div>
       <div className="font-display font-bold text-2xl text-white mt-1">{value}</div>
+    </div>
+  );
+}
+
+/* ---------- 11. IDEA QUALITY INSPECTOR ---------- */
+function IdeaQuality({ sessionId }) {
+  const { data, loading, run } = useAITool("/validation/idea-quality", sessionId);
+  const tone = (s) => s >= 75 ? "text-emerald-300" : s >= 50 ? "text-amber-300" : "text-rose-300";
+  return (
+    <div data-testid="quality-view">
+      <ToolHeader title="Idea Quality Inspector" subtitle="Microscope on your raw idea — clarity, scope, feasibility & originality scores + smell-fix list." onRun={run} loading={loading} icon={<Microscope size={20} className="text-amber-300" />} ready={!!data} />
+      {!data && !loading && <div className="glass p-8 t-soft text-center">Click Run to inspect your idea quality.</div>}
+      {data && (
+        <>
+          <div className="glass-heavy p-7 mb-5 text-center">
+            <div className="text-[10px] tracking-[0.2em] uppercase font-bold t-mute">Overall</div>
+            <div className={`font-display font-bold text-7xl glow-text mt-2 ${tone(data.overall_score)}`}>{data.overall_score}</div>
+            <div className="font-display font-semibold text-xl text-amber-200 mt-1 italic">{data.rating}</div>
+          </div>
+          <div className="grid md:grid-cols-4 gap-4 mb-5">
+            {[["Clarity", data.clarity_score], ["Scope", data.scope_score], ["Feasibility", data.feasibility_score], ["Originality", data.originality_score]].map(([k, v]) => (
+              <div key={k} className="glass p-5 text-center" data-testid={`quality-${k.toLowerCase()}`}>
+                <div className="text-[10px] tracking-[0.2em] uppercase font-bold t-mute">{k}</div>
+                <div className={`font-display font-bold text-3xl mt-1 ${tone(v)}`}>{v}</div>
+              </div>
+            ))}
+          </div>
+          <div className="glass-heavy p-5 mb-5">
+            <div className="text-[10px] tracking-[0.2em] uppercase font-bold text-amber-300 mb-2">Crisp rewrite</div>
+            <div className="font-display italic text-lg text-white">"{data.rewrite}"</div>
+          </div>
+          {(data.smells || []).length > 0 && (
+            <div className="space-y-3 mb-5">
+              {data.smells.map((s, i) => (
+                <div key={i} className="glass p-4 border-l-2 border-rose-400/60" data-testid={`smell-${i}`}>
+                  <div className="font-display font-semibold text-rose-300">{s.issue}</div>
+                  <div className="text-xs t-mute mt-1 italic">"{s.quote}"</div>
+                  <div className="text-sm t-soft mt-2"><span className="text-emerald-300 font-semibold">Fix: </span>{s.fix}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {data.missing_specifics?.length > 0 && (
+            <div className="glass p-5 mb-5">
+              <div className="text-[10px] tracking-[0.2em] uppercase font-bold t-mute mb-2">Still unclear</div>
+              <ul className="space-y-1 t-soft">{data.missing_specifics.map((m, i) => <li key={i}>? {m}</li>)}</ul>
+            </div>
+          )}
+          {data.encouragement && <div className="glass p-5 t-soft italic text-center">"{data.encouragement}"</div>}
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ---------- 12. SWOT ---------- */
+function SWOT({ sessionId }) {
+  const { data, loading, run } = useAITool("/validation/swot", sessionId);
+  const Quadrant = ({ title, items, color, testid }) => (
+    <div className={`glass p-5 border-l-4 ${color}`} data-testid={testid}>
+      <div className="font-display font-semibold text-lg text-white mb-2">{title}</div>
+      <ul className="space-y-1.5 text-sm t-soft">{(items || []).map((x, i) => <li key={i}>• {x}</li>)}</ul>
+    </div>
+  );
+  return (
+    <div data-testid="swot-view">
+      <ToolHeader title="SWOT Analysis" subtitle="Sharp 4-item-per-quadrant SWOT plus 90-day strategic priorities." onRun={run} loading={loading} icon={<Compass size={20} className="text-amber-300" />} ready={!!data} />
+      {!data && !loading && <div className="glass p-8 t-soft text-center">Click Run to map your SWOT.</div>}
+      {data && (
+        <>
+          <div className="grid md:grid-cols-2 gap-5 mb-5">
+            <Quadrant title="Strengths" items={data.strengths} color="border-emerald-400/60" testid="swot-strengths" />
+            <Quadrant title="Weaknesses" items={data.weaknesses} color="border-rose-400/60" testid="swot-weaknesses" />
+            <Quadrant title="Opportunities" items={data.opportunities} color="border-amber-300/60" testid="swot-opportunities" />
+            <Quadrant title="Threats" items={data.threats} color="border-violet-400/60" testid="swot-threats" />
+          </div>
+          {data.strategic_priorities?.length > 0 && (
+            <div className="glass-heavy p-6">
+              <h4 className="font-display font-semibold text-xl text-white mb-3">90-day strategic priorities</h4>
+              <ol className="space-y-2">{data.strategic_priorities.map((p, i) => <li key={i} className="flex gap-3 t-soft"><span className="w-6 h-6 rounded-full bg-amber-300/15 text-amber-200 text-xs flex items-center justify-center font-bold">{i + 1}</span>{p}</li>)}</ol>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ---------- 13. TRENDS ---------- */
+function Trends({ sessionId }) {
+  const { data, loading, run } = useAITool("/validation/trends", sessionId);
+  const trajColor = data?.demand_trajectory === "Rising" ? "text-emerald-300" : data?.demand_trajectory === "Declining" ? "text-rose-300" : "text-amber-300";
+  return (
+    <div data-testid="trends-view">
+      <ToolHeader title="Trend & Demand Signal" subtitle="Search keywords, 5-year trend index, social signals, and geographic hotspots." onRun={run} loading={loading} icon={<TrendingUp size={20} className="text-amber-300" />} ready={!!data} />
+      {!data && !loading && <div className="glass p-8 t-soft text-center">Click Run to read the market signals.</div>}
+      {data && (
+        <>
+          <div className="grid md:grid-cols-3 gap-5 mb-5">
+            <div className="glass p-5"><div className="text-[10px] tracking-[0.2em] uppercase font-bold t-mute">Trajectory</div><div className={`font-display font-bold text-3xl mt-1 ${trajColor}`}>{data.demand_trajectory}</div></div>
+            <div className="glass p-5"><div className="text-[10px] tracking-[0.2em] uppercase font-bold t-mute">Search intent</div><div className="font-display font-bold text-2xl text-amber-200 mt-1">{data.search_intent}</div></div>
+            <div className="glass p-5"><div className="text-[10px] tracking-[0.2em] uppercase font-bold t-mute mb-2">Top keywords</div><div className="flex flex-wrap gap-2">{(data.primary_keywords || []).map((k, i) => <span key={i} className="chip-soft">{k}</span>)}</div></div>
+          </div>
+          <div className="glass p-5 mb-5">
+            <h4 className="font-display font-semibold text-xl text-white mb-3">5-year interest index</h4>
+            <ResponsiveContainer width="100%" height={240}>
+              <LineChart data={data.trend_index_5y || []}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(244,239,226,0.06)" />
+                <XAxis dataKey="year" stroke="rgba(244,239,226,0.55)" />
+                <YAxis stroke="rgba(244,239,226,0.55)" domain={[0, 100]} />
+                <Tooltip {...tooltipStyle} />
+                <Line type="monotone" dataKey="index" stroke="#E6C870" strokeWidth={2.5} dot={{ fill: "#E6C870", r: 5 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="grid md:grid-cols-2 gap-5 mb-5">
+            <div className="glass p-5">
+              <div className="text-[10px] tracking-[0.2em] uppercase font-bold t-mute mb-2">Rising sub-topics</div>
+              <ul className="space-y-1 t-soft">{(data.rising_subtopics || []).map((s, i) => <li key={i}>↗ {s}</li>)}</ul>
+            </div>
+            <div className="glass p-5">
+              <div className="text-[10px] tracking-[0.2em] uppercase font-bold t-mute mb-2">Geographic hotspots</div>
+              <div className="flex flex-wrap gap-2">{(data.geographic_hotspots || []).map((h, i) => <span key={i} className="chip-soft">{h}</span>)}</div>
+            </div>
+          </div>
+          {data.social_signals && (
+            <div className="grid md:grid-cols-4 gap-3 mb-5">
+              {Object.entries(data.social_signals).map(([k, v], i) => (
+                <div key={i} className="glass p-4">
+                  <div className="text-[10px] tracking-[0.2em] uppercase font-bold t-gold">{k.replace("_", " / ")}</div>
+                  <div className="text-sm t-soft mt-1">{v}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {data.recommended_window && (
+            <div className="glass-heavy p-5"><div className="text-[10px] tracking-[0.2em] uppercase font-bold text-amber-300 mb-2">Why now?</div><div className="t-soft">{data.recommended_window}</div></div>
+          )}
+        </>
+      )}
     </div>
   );
 }
