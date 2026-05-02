@@ -103,7 +103,9 @@ function useAITool(endpoint, sessionId) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const run = async (extra = {}) => {
+  const run = async (extra) => {
+    // Ignore React synthetic event accidentally passed as arg
+    const safeExtra = (extra && typeof extra === "object" && !extra.nativeEvent && !extra._reactName) ? extra : {};
     setLoading(true);
     setError(null);
     let lastErr = null;
@@ -111,7 +113,7 @@ function useAITool(endpoint, sessionId) {
       try {
         const res = await axios.post(
           `${API}${endpoint}`,
-          { session_id: sessionId, ...extra },
+          { session_id: sessionId, ...safeExtra },
           { timeout: 90000 }
         );
         setData(res.data);
@@ -119,7 +121,6 @@ function useAITool(endpoint, sessionId) {
         return;
       } catch (e) {
         lastErr = e;
-        // Retry once on network/timeout/502/504; don't retry on 4xx
         const status = e?.response?.status;
         if (status && status < 500 && status !== 408) break;
       }
