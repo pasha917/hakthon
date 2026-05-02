@@ -46,7 +46,7 @@ class SupportRequest(BaseModel):
     country: Optional[str] = "India"
 
 class VerdictRequest(BaseModel):
-    session_id: str
+    session_id: Optional[str] = None
 
 class VoiceChatInput(BaseModel):
     session_id: Optional[str] = None
@@ -81,14 +81,14 @@ def _extract_json(text: str) -> Any:
     raise ValueError("Failed to parse JSON from LLM response")
 
 
-async def _llm_json(system_prompt: str, user_prompt: str, session_id: str) -> Any:
+async def _llm_json(system_prompt: str, user_prompt: str, session_id: str, model: Optional[str] = None) -> Any:
     if not EMERGENT_LLM_KEY:
         raise HTTPException(status_code=500, detail="LLM key not configured")
     chat = LlmChat(
         api_key=EMERGENT_LLM_KEY,
         session_id=session_id,
         system_message=system_prompt,
-    ).with_model(LLM_PROVIDER, LLM_MODEL)
+    ).with_model(LLM_PROVIDER, model or LLM_MODEL)
     msg = UserMessage(text=user_prompt)
     try:
         response = await chat.send_message(msg)
@@ -237,60 +237,76 @@ JSON schema:
 @api_router.post("/final-verdict")
 async def final_verdict(payload: VerdictRequest):
     """Step 5: Aggregate everything, generate verdict + chart data."""
+    if not payload.session_id:
+        raise HTTPException(status_code=400, detail="session_id is required. Please restart the flow.")
     session = await _get_session(payload.session_id)
     system = (
         "You are a top startup strategist. Based on all prior analysis, produce a final verdict "
         "with data suitable for charts. Respond with STRICT valid JSON only."
     )
     context_blob = json.dumps({
-        "step1": session.get("step1"),
-        "step2": session.get("step2"),
-        "step3": session.get("step3"),
-        "step4": session.get("step4"),
-    })[:12000]
+        "idea": (session.get("step1") or {}).get("idea"),
+        "domain": ((session.get("step1") or {}).get("result") or {}).get("domain"),
+        "selected_problem": (session.get("step2") or {}).get("selected_problem"),
+        "refined_idea": (session.get("step3") or {}).get("refined_idea"),
+        "analysis": (session.get("step3") or {}).get("result"),
+    })[:6000]
     user = f"""
-Full analysis context so far:
+Context:
 {context_blob}
 
-Produce the final verdict. Be realistic with numbers. Currency in USD.
+Be concise. Return ONLY valid JSON, no prose.
 
-JSON schema:
+Schema:
 {{
-  "verdict_summary": "3-4 sentences overall judgement",
+  "verdict_summary": "2-3 sentences",
   "viability_score": 0-100,
   "world_impact_score": 0-100,
-  "years_to_success": {{"min": number, "likely": number, "max": number}},
+  "years_to_success": {{"min": int, "likely": int, "max": int}},
   "growth_projection": [
-    {{"year": 1, "users": number, "revenue_usd": number}},
-    {{"year": 2, "users": number, "revenue_usd": number}},
-    {{"year": 3, "users": number, "revenue_usd": number}},
-    {{"year": 4, "users": number, "revenue_usd": number}},
-    {{"year": 5, "users": number, "revenue_usd": number}}
+    {{"year":1,"users":int,"revenue_usd":int}},
+    {{"year":2,"users":int,"revenue_usd":int}},
+    {{"year":3,"users":int,"revenue_usd":int}},
+    {{"year":4,"users":int,"revenue_usd":int}},
+    {{"year":5,"users":int,"revenue_usd":int}}
   ],
   "funding_breakdown": [
-    {{"setup":"From Home (Solo)","initial_usd": number,"monthly_burn_usd": number,"runway_months": number,"team_size": 1}},
-    {{"setup":"Registered Company (Lean)","initial_usd": number,"monthly_burn_usd": number,"runway_months": number,"team_size": number}},
-    {{"setup":"Company + Employees (Scaled)","initial_usd": number,"monthly_burn_usd": number,"runway_months": number,"team_size": number}}
+    {{"setup":"From Home (Solo)","initial_usd":int,"monthly_burn_usd":int,"runway_months":int,"team_size":1}},
+    {{"setup":"Registered Company (Lean)","initial_usd":int,"monthly_burn_usd":int,"runway_months":int,"team_size":int}},
+    {{"setup":"Company + Employees (Scaled)","initial_usd":int,"monthly_burn_usd":int,"runway_months":int,"team_size":int}}
   ],
   "cost_categories": [
-    {{"name":"Product/Tech","pct": number}},
-    {{"name":"Marketing","pct": number}},
-    {{"name":"Operations","pct": number}},
-    {{"name":"Legal/Compliance","pct": number}},
-    {{"name":"Salaries","pct": number}}
+    {{"name":"Product/Tech","pct":int}},
+    {{"name":"Marketing","pct":int}},
+    {{"name":"Operations","pct":int}},
+    {{"name":"Legal/Compliance","pct":int}},
+    {{"name":"Salaries","pct":int}}
   ],
   "risk_radar": [
-    {{"axis":"Market","score": 0-100}},
-    {{"axis":"Tech","score": 0-100}},
-    {{"axis":"Funding","score": 0-100}},
-    {{"axis":"Team","score": 0-100}},
-    {{"axis":"Regulatory","score": 0-100}}
+    {{"axis":"Market","score":0-100}},
+    {{"axis":"Tech","score":0-100}},
+    {{"axis":"Funding","score":0-100}},
+    {{"axis":"Team","score":0-100}},
+    {{"axis":"Regulatory","score":0-100}}
   ],
-  "final_advice": "paragraph with clear verdict: go/no-go + why + first step"
+  "final_advice": "2-3 sentences, clear go/no-go + first step"
 }}
-Ensure cost_categories sum approximately to 100.
+pct values in cost_categories must sum to 100. Keep all strings short.
 """
-    data = await _llm_json(system, user, payload.session_id)
+    data = await _llm_json(system, user, payload.session_id, model="claude-haiku-4-5-20251001")
+    # Normalize: sort growth_projection by year, ensure cost pct sums ~100
+    try:
+        gp = data.get("growth_projection")
+        if isinstance(gp, list):
+            data["growth_projection"] = sorted(gp, key=lambda r: r.get("year", 0))
+        cc = data.get("cost_categories")
+        if isinstance(cc, list) and cc:
+            total = sum(float(c.get("pct", 0) or 0) for c in cc)
+            if total and abs(total - 100) > 0.5:
+                for c in cc:
+                    c["pct"] = round(float(c.get("pct", 0) or 0) * 100.0 / total, 1)
+    except Exception:
+        pass
     await _save_session(payload.session_id, {"step5": {"result": data}})
     return {"session_id": payload.session_id, **data}
 

@@ -62,28 +62,36 @@ export default function Wizard() {
   // Step 2 -> 3
   const pickProblem = (problem) => { setState((s) => ({ ...s, selectedProblem: problem })); go(3); };
 
+  const getSid = () => state.sessionId || localStorage.getItem("advisor_session_id");
+
   // Step 3 -> 4
   const submitRefinedIdea = async (refined) => {
     if (!refined.trim()) { toast.error("Share your solution idea"); return; }
+    const sid = getSid();
+    if (!sid) { toast.error("Session missing. Please restart."); return; }
     setLoading(true);
     try {
       const res = await axios.post(`${API}/analyze-problem`, {
-        session_id: state.sessionId,
+        session_id: sid,
         selected_problem: state.selectedProblem,
         refined_idea: refined,
       });
       setState((s) => ({ ...s, refinedIdea: refined, analysis: res.data }));
       go(4);
-      fetchResources();
-    } catch (e) { toast.error("Analysis failed."); }
-    finally { setLoading(false); }
+      fetchResources(sid);
+    } catch (e) {
+      const msg = e?.response?.data?.detail || "Analysis failed.";
+      toast.error(typeof msg === "string" ? msg : "Analysis failed.");
+    } finally { setLoading(false); }
   };
 
-  const fetchResources = async () => {
+  const fetchResources = async (sidArg) => {
+    const sid = sidArg || getSid();
+    if (!sid) return;
     setLoading(true);
     try {
       const res = await axios.post(`${API}/support-resources`, {
-        session_id: state.sessionId,
+        session_id: sid,
         domain: state.domain,
         country: "India",
       });
@@ -94,13 +102,17 @@ export default function Wizard() {
 
   // Step 4 -> 5
   const generateVerdict = async () => {
+    const sid = getSid();
+    if (!sid) { toast.error("Session missing. Please restart."); return; }
     setLoading(true);
     try {
-      const res = await axios.post(`${API}/final-verdict`, { session_id: state.sessionId });
+      const res = await axios.post(`${API}/final-verdict`, { session_id: sid }, { timeout: 120000 });
       setState((s) => ({ ...s, verdict: res.data }));
       go(5);
-    } catch (e) { toast.error("Verdict failed. Retry."); }
-    finally { setLoading(false); }
+    } catch (e) {
+      const detail = e?.response?.data?.detail || e?.message || "Verdict failed. Retry.";
+      toast.error(typeof detail === "string" ? detail : "Verdict failed. Retry.");
+    } finally { setLoading(false); }
   };
 
   const restart = () => {
