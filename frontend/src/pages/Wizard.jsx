@@ -8,6 +8,7 @@ import Step2Problems from "@/pages/steps/Step2Problems";
 import Step3Analysis from "@/pages/steps/Step3Analysis";
 import Step4Support from "@/pages/steps/Step4Support";
 import Step5Verdict from "@/pages/steps/Step5Verdict";
+import Forge from "@/pages/Forge";
 import VoiceCallModal, { VoiceCallButton } from "@/components/VoiceCallModal";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -23,6 +24,7 @@ export default function Wizard() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [voiceCallOpen, setVoiceCallOpen] = useState(false);
+  const [voiceMode, setVoiceMode] = useState("advisor");
   const [state, setState] = useState({
     sessionId: null,
     idea: "",
@@ -185,6 +187,16 @@ export default function Wizard() {
               domain={state.domain}
               onBack={() => go(4)}
               onRestart={restart}
+              onForge={() => go(6)}
+            />
+          )}
+          {step === 6 && (
+            <Forge
+              sessionId={state.sessionId}
+              brand={state.idea?.split(" ").slice(0, 2).join(" ") || "Your Startup"}
+              domain={state.domain}
+              onBack={() => go(5)}
+              onOpenPitchPractice={() => { setVoiceMode("pitch"); setVoiceCallOpen(true); }}
             />
           )}
         </motion.div>
@@ -192,8 +204,9 @@ export default function Wizard() {
 
       <VoiceCallModal
         open={voiceCallOpen}
-        onClose={() => setVoiceCallOpen(false)}
+        onClose={() => { setVoiceCallOpen(false); setVoiceMode("advisor"); }}
         sessionId={state.sessionId || (typeof window !== "undefined" ? localStorage.getItem("advisor_session_id") : null)}
+        mode={voiceMode}
       />
     </div>
   );

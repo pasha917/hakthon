@@ -1,10 +1,13 @@
-from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File
+from fastapi.responses import StreamingResponse, Response
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
+import io
 import json
 import re
+import base64
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
@@ -12,6 +15,7 @@ from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone
 from emergentintegrations.llm.chat import LlmChat, UserMessage
+from emergentintegrations.llm.openai import OpenAISpeechToText, OpenAITextToSpeech
 
 
 ROOT_DIR = Path(__file__).parent
@@ -348,6 +352,269 @@ async def get_session(session_id: str):
     if not doc:
         raise HTTPException(status_code=404, detail="Session not found")
     return doc
+
+
+# =============== VOICE: STT (Whisper) ===============
+@api_router.post("/stt")
+async def speech_to_text(audio: UploadFile = File(...)):
+    if not EMERGENT_LLM_KEY:
+        raise HTTPException(status_code=500, detail="LLM key not configured")
+    try:
+        stt = OpenAISpeechToText(api_key=EMERGENT_LLM_KEY)
+        data = await audio.read()
+        if not data:
+            raise HTTPException(status_code=400, detail="Empty audio")
+        # Whisper expects a file-like with a name + content_type for proper handling
+        buf = io.BytesIO(data)
+        buf.name = audio.filename or "audio.webm"
+        resp = await stt.transcribe(file=buf, model="whisper-1", response_format="json", language="en")
+        text = getattr(resp, "text", None) or (resp.get("text") if isinstance(resp, dict) else "") or ""
+        return {"text": text.strip()}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.exception("STT failed")
+        raise HTTPException(status_code=502, detail=f"STT error: {e}")
+
+
+# =============== VOICE: TTS (OpenAI) ===============
+class TTSRequest(BaseModel):
+    text: str
+    voice: Optional[str] = "nova"
+    model: Optional[str] = "tts-1"
+    speed: Optional[float] = 1.05
+
+@api_router.post("/tts")
+async def text_to_speech(payload: TTSRequest):
+    if not EMERGENT_LLM_KEY:
+        raise HTTPException(status_code=500, detail="LLM key not configured")
+    if not payload.text or not payload.text.strip():
+        raise HTTPException(status_code=400, detail="Empty text")
+    try:
+        tts = OpenAITextToSpeech(api_key=EMERGENT_LLM_KEY)
+        audio_bytes = await tts.generate_speech(
+            text=payload.text[:4000],
+            model=payload.model or "tts-1",
+            voice=payload.voice or "nova",
+            speed=payload.speed or 1.05,
+            response_format="mp3",
+        )
+        return Response(content=audio_bytes, media_type="audio/mpeg")
+    except Exception as e:
+        logging.exception("TTS failed")
+        raise HTTPException(status_code=502, detail=f"TTS error: {e}")
+
+
+# =============== LOGO / BRAND IDENTITY (Nano Banana) ===============
+class LogoRequest(BaseModel):
+    session_id: Optional[str] = None
+    brand_name: str
+    style: Optional[str] = "modern, luxurious, minimal, premium"
+    palette: Optional[str] = "deep navy, gold, ivory accents"
+
+@api_router.post("/generate-logo")
+async def generate_logo(payload: LogoRequest):
+    if not EMERGENT_LLM_KEY:
+        raise HTTPException(status_code=500, detail="LLM key not configured")
+    sid = payload.session_id or str(uuid.uuid4())
+    domain = ""
+    pitch = ""
+    if payload.session_id:
+        s = await db.sessions.find_one({"session_id": payload.session_id}, {"_id": 0})
+        if s:
+            domain = ((s.get("step1") or {}).get("result") or {}).get("domain", "") or ""
+            pitch = ((s.get("step3") or {}).get("result") or {}).get("one_line_pitch", "") or ""
+    prompt = (
+        f"A premium minimalist startup LOGO for a brand named '{payload.brand_name}'. "
+        f"Industry: {domain or 'startup'}. Vibe: {pitch or 'innovative and trustworthy'}. "
+        f"Style: {payload.style}. Color palette: {payload.palette}. "
+        "Centered on a clean background. Vector-like flat marks, geometric, no text watermarks, "
+        "high contrast, balanced composition, suitable for app icon and website header. "
+        "Render only ONE single iconic mark."
+    )
+    try:
+        chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=f"logo-{sid}", system_message="You are a premium brand designer.")
+        chat.with_model("gemini", "gemini-3.1-flash-image-preview").with_params(modalities=["image", "text"])
+        _text, images = await chat.send_message_multimodal_response(UserMessage(text=prompt))
+        if not images:
+            raise HTTPException(status_code=502, detail="No image returned")
+        img = images[0]
+        return {
+            "session_id": sid,
+            "brand_name": payload.brand_name,
+            "mime_type": img.get("mime_type", "image/png"),
+            "image_b64": img.get("data"),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.exception("Logo generation failed")
+        raise HTTPException(status_code=502, detail=f"Logo error: {e}")
+
+
+# =============== PITCH DECK GENERATOR ===============
+class PitchDeckRequest(BaseModel):
+    session_id: str
+    brand_name: Optional[str] = None
+
+@api_router.post("/pitch-deck")
+async def pitch_deck(payload: PitchDeckRequest):
+    session = await _get_session(payload.session_id)
+    brand = payload.brand_name or "Your Startup"
+    ctx = json.dumps({
+        "domain": ((session.get("step1") or {}).get("result") or {}).get("domain"),
+        "selected_problem": (session.get("step2") or {}).get("selected_problem"),
+        "refined_idea": (session.get("step3") or {}).get("refined_idea"),
+        "analysis": (session.get("step3") or {}).get("result"),
+        "verdict": (session.get("step5") or {}).get("result"),
+    })[:7000]
+    system = "You are a top-tier YC partner crafting a 10-slide investor deck. Return STRICT valid JSON only."
+    user = f"""
+Brand name: {brand}
+Context: {ctx}
+
+Produce a punchy 10-slide pitch deck. JSON schema:
+{{
+  "brand": "string",
+  "tagline": "5-8 words",
+  "slides": [
+    {{"n":1,"title":"Title","bullets":["punchy line"],"speaker_notes":"1-2 sentences"}},
+    {{"n":2,"title":"Problem","bullets":["3-4 bullets"],"speaker_notes":"..."}},
+    {{"n":3,"title":"Solution","bullets":["..."],"speaker_notes":"..."}},
+    {{"n":4,"title":"Why Now","bullets":["..."],"speaker_notes":"..."}},
+    {{"n":5,"title":"Market Size","bullets":["TAM/SAM/SOM with numbers"],"speaker_notes":"..."}},
+    {{"n":6,"title":"Product","bullets":["..."],"speaker_notes":"..."}},
+    {{"n":7,"title":"Business Model","bullets":["pricing, unit economics"],"speaker_notes":"..."}},
+    {{"n":8,"title":"Traction & Roadmap","bullets":["..."],"speaker_notes":"..."}},
+    {{"n":9,"title":"Team","bullets":["roles needed, founder strengths"],"speaker_notes":"..."}},
+    {{"n":10,"title":"The Ask","bullets":["amount, runway, milestones"],"speaker_notes":"..."}}
+  ]
+}}
+Each bullet under 12 words. Speaker notes under 30 words.
+"""
+    data = await _llm_json(system, user, payload.session_id, model="claude-haiku-4-5-20251001")
+    await _save_session(payload.session_id, {"pitch_deck": data})
+    return {"session_id": payload.session_id, **data}
+
+
+# =============== MVP TECH STACK & COST ===============
+class TechStackRequest(BaseModel):
+    session_id: str
+
+@api_router.post("/tech-stack")
+async def tech_stack(payload: TechStackRequest):
+    session = await _get_session(payload.session_id)
+    ctx = json.dumps({
+        "domain": ((session.get("step1") or {}).get("result") or {}).get("domain"),
+        "refined_idea": (session.get("step3") or {}).get("refined_idea"),
+        "analysis": (session.get("step3") or {}).get("result"),
+    })[:5000]
+    system = "You are a pragmatic CTO advisor. Return STRICT valid JSON only."
+    user = f"""
+Context: {ctx}
+
+Recommend a lean MVP tech stack and 3-month build plan. JSON schema:
+{{
+  "stack": [
+    {{"category":"Frontend","choice":"...","why":"...","monthly_cost_usd": int}},
+    {{"category":"Backend","choice":"...","why":"...","monthly_cost_usd": int}},
+    {{"category":"Database","choice":"...","why":"...","monthly_cost_usd": int}},
+    {{"category":"AI/ML","choice":"...","why":"...","monthly_cost_usd": int}},
+    {{"category":"Hosting","choice":"...","why":"...","monthly_cost_usd": int}},
+    {{"category":"Auth","choice":"...","why":"...","monthly_cost_usd": int}},
+    {{"category":"Analytics","choice":"...","why":"...","monthly_cost_usd": int}}
+  ],
+  "milestones": [
+    {{"week": 1, "goal":"...","deliverable":"..."}},
+    {{"week": 2, "goal":"...","deliverable":"..."}},
+    {{"week": 4, "goal":"...","deliverable":"..."}},
+    {{"week": 8, "goal":"...","deliverable":"..."}},
+    {{"week": 12, "goal":"...","deliverable":"..."}}
+  ],
+  "total_monthly_cost_usd": int,
+  "build_time_weeks": int,
+  "tips": ["3 sharp tips for a solo / lean team"]
+}}
+Be realistic with costs.
+"""
+    data = await _llm_json(system, user, payload.session_id, model="claude-haiku-4-5-20251001")
+    await _save_session(payload.session_id, {"tech_stack": data})
+    return {"session_id": payload.session_id, **data}
+
+
+# =============== INVESTOR PITCH PRACTICE (voice role-play) ===============
+class PitchPracticeInput(BaseModel):
+    session_id: Optional[str] = None
+    message: str
+    persona: Optional[str] = "tough"  # tough | friendly | technical
+
+@api_router.post("/pitch-practice")
+async def pitch_practice(payload: PitchPracticeInput):
+    if not EMERGENT_LLM_KEY:
+        raise HTTPException(status_code=500, detail="LLM key not configured")
+    sid = payload.session_id or str(uuid.uuid4())
+    context = ""
+    if payload.session_id:
+        doc = await db.sessions.find_one({"session_id": payload.session_id}, {"_id": 0})
+        if doc:
+            context = json.dumps({
+                "refined_idea": (doc.get("step3") or {}).get("refined_idea"),
+                "analysis": (doc.get("step3") or {}).get("result"),
+                "verdict": (doc.get("step5") or {}).get("result"),
+            })[:4000]
+    persona_prompt = {
+        "tough": "You are SARAH KIM, a sharp Sequoia partner. Skeptical, direct, asks brutal questions about traction, unit economics, defensibility, and competition. Never sugar-coat.",
+        "friendly": "You are an encouraging angel investor. Curious and warm but probes for clarity.",
+        "technical": "You are a CTO-turned-investor. Drill into tech feasibility, scalability, and engineering risks.",
+    }.get(payload.persona, "You are a tough investor.")
+    system = (
+        f"{persona_prompt} You are role-playing an investor pitch meeting. "
+        "Stay strictly IN CHARACTER. Speak conversationally — short replies (1-3 sentences, ~30-60 words). "
+        "Ask one focused question at a time. No markdown. After the founder pitches, push hard on weak points. "
+        "Periodically score them privately and adapt."
+    )
+    user = f"Founder said: {payload.message}\n\nStartup context (private):\n{context}"
+    chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=f"pitch-{sid}", system_message=system).with_model("anthropic", "claude-haiku-4-5-20251001")
+    try:
+        reply = await chat.send_message(UserMessage(text=user))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+    return {"session_id": sid, "reply": (reply or "").strip()}
+
+
+# =============== MARKETING PLAN ===============
+class MarketingRequest(BaseModel):
+    session_id: str
+
+@api_router.post("/marketing-plan")
+async def marketing_plan(payload: MarketingRequest):
+    session = await _get_session(payload.session_id)
+    ctx = json.dumps({
+        "domain": ((session.get("step1") or {}).get("result") or {}).get("domain"),
+        "refined_idea": (session.get("step3") or {}).get("refined_idea"),
+        "verdict": (session.get("step5") or {}).get("result"),
+    })[:4500]
+    system = "You are a growth marketer. Return STRICT valid JSON only."
+    user = f"""
+Context: {ctx}
+
+Build a 30/60/90-day go-to-market plan focused on lean budget. JSON schema:
+{{
+  "north_star_metric":"...",
+  "ideal_customer":"1-2 sentences",
+  "channels": [
+    {{"channel":"...","priority":"High|Medium|Low","budget_usd": int,"weekly_actions":["..."],"kpi":"..."}}
+  ],
+  "30_days": ["3-5 actions"],
+  "60_days": ["3-5 actions"],
+  "90_days": ["3-5 actions"],
+  "viral_hooks": ["3 sharp hooks specifically tailored to this startup"]
+}}
+List 5-7 channels.
+"""
+    data = await _llm_json(system, user, payload.session_id, model="claude-haiku-4-5-20251001")
+    await _save_session(payload.session_id, {"marketing": data})
+    return {"session_id": payload.session_id, **data}
 
 
 app.include_router(api_router)
