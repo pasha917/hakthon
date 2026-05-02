@@ -23,26 +23,31 @@ export default function StepProgress({ current }) {
           <React.Fragment key={s.id}>
             <motion.div
               layout
-              className={`flex items-center gap-2 px-3 py-2 rounded-full border transition-all ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-full border transition-all relative overflow-hidden ${
                 active
-                  ? "bg-indigo-600 text-white border-indigo-600 shadow-[0_10px_30px_rgba(99,102,241,0.35)]"
+                  ? "border-amber-300/50 text-amber-100"
                   : done
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                  : "bg-white/60 text-indigo-900 border-white/70"
+                  ? "border-emerald-400/30 text-emerald-300"
+                  : "border-white/10 text-white/55"
               }`}
+              style={
+                active
+                  ? { background: "linear-gradient(135deg, rgba(230,200,112,0.18), rgba(139,92,246,0.18))", boxShadow: "0 8px 26px rgba(230,200,112,0.18)" }
+                  : { background: "rgba(255,255,255,0.03)" }
+              }
               data-testid={`step-pill-${s.id}`}
             >
               <div
                 className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                  active ? "bg-white/20" : done ? "bg-emerald-100" : "bg-indigo-50 text-indigo-600"
+                  active ? "bg-amber-300/20 text-amber-200" : done ? "bg-emerald-400/15 text-emerald-300" : "bg-white/5 text-white/55"
                 }`}
               >
                 {done ? <Check size={14} /> : s.id}
               </div>
-              <span className="hidden sm:inline text-sm font-semibold">{s.label}</span>
+              <span className="hidden sm:inline text-xs font-semibold tracking-widest uppercase">{s.label}</span>
             </motion.div>
             {i < STEPS.length - 1 && (
-              <div className="hidden sm:block w-6 h-px bg-indigo-200" />
+              <div className="hidden sm:block w-6 h-px bg-gradient-to-r from-amber-200/40 to-transparent" />
             )}
           </React.Fragment>
         );

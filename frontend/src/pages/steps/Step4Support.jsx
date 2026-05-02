@@ -1,33 +1,33 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Loader2, Landmark, ExternalLink } from "lucide-react";
+import RevealText from "@/components/RevealText";
 
 const kindColor = (k) => ({
-  Government: "bg-indigo-50 text-indigo-700 border-indigo-100",
-  Grant: "bg-emerald-50 text-emerald-700 border-emerald-100",
-  Accelerator: "bg-rose-50 text-rose-700 border-rose-100",
-  Bank: "bg-sky-50 text-sky-700 border-sky-100",
-  NGO: "bg-amber-50 text-amber-700 border-amber-100",
-}[k] || "bg-indigo-50 text-indigo-700 border-indigo-100");
+  Government: "border-amber-300/40 text-amber-200 bg-amber-300/10",
+  Grant: "border-emerald-400/40 text-emerald-200 bg-emerald-400/10",
+  Accelerator: "border-rose-400/40 text-rose-200 bg-rose-400/10",
+  Bank: "border-sky-400/40 text-sky-200 bg-sky-400/10",
+  NGO: "border-violet-400/40 text-violet-200 bg-violet-400/10",
+}[k] || "border-white/10 text-white/70 bg-white/5");
 
 export default function Step4Support({ domain, resources, loading, onNext, onBack }) {
   const list = resources?.resources || [];
 
   return (
     <div>
-      <div className="mb-6">
-        <div className="chip mb-3"><Landmark size={14} /> STEP 4 · FUNDING & SUPPORT</div>
-        <h2 className="font-display font-extrabold text-3xl sm:text-4xl text-indigo-950 mb-2">
-          Grants, govt schemes & backers for <span className="text-indigo-600">{domain}</span>
-        </h2>
-        <p className="text-indigo-900/70 max-w-3xl">
-          Hand-picked starting points. Tap a card to open the official page.
-        </p>
+      <div className="mb-9">
+        <div className="chip mb-4"><Landmark size={12} /> Step 04 · Funding & support</div>
+        <RevealText
+          text={`Grants & backers for ${domain}`}
+          className="font-display font-bold text-3xl sm:text-5xl text-white mb-3"
+        />
+        <p className="t-soft max-w-3xl">Hand-picked starting points. Tap any card to open the official portal.</p>
       </div>
 
       {loading && !list.length ? (
-        <div className="flex items-center gap-2 text-indigo-700 py-12 justify-center" data-testid="resources-loading">
-          <Loader2 className="animate-spin" size={18} /> Finding the best support for you...
+        <div className="flex items-center gap-2 text-amber-200 py-16 justify-center" data-testid="resources-loading">
+          <Loader2 className="animate-spin" size={18} /> Curating the best support for you…
         </div>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -37,23 +37,26 @@ export default function Step4Support({ domain, resources, loading, onNext, onBac
               href={r.url || "#"}
               target="_blank"
               rel="noreferrer"
-              whileHover={{ y: -4 }}
-              className="glass rounded-3xl p-5 hover:shadow-xl transition-all"
+              whileHover={{ y: -6 }}
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 * i }}
+              className="glass sheen lift p-6 block"
               data-testid={`resource-card-${i}`}
             >
               <div className="flex items-start justify-between gap-2">
-                <span className={`text-[11px] font-semibold rounded-full border px-2.5 py-1 ${kindColor(r.kind)}`}>
+                <span className={`text-[10px] tracking-widest uppercase font-bold rounded-full border px-2.5 py-1 ${kindColor(r.kind)}`}>
                   {r.kind}
                 </span>
-                <ExternalLink size={14} className="text-indigo-600" />
+                <ExternalLink size={14} className="text-amber-200" />
               </div>
-              <div className="mt-3 font-display font-bold text-lg text-indigo-950 leading-snug">{r.name}</div>
-              <div className="text-xs text-indigo-700/70 mt-1">{r.country}</div>
-              <p className="text-sm text-indigo-900/70 mt-3 leading-relaxed">{r.what_it_offers}</p>
-              <div className="mt-3 text-xs text-indigo-900/60">
-                <span className="font-semibold text-indigo-800">Eligibility · </span>{r.eligibility}
+              <div className="mt-4 font-display font-semibold text-xl text-white leading-snug">{r.name}</div>
+              <div className="text-xs t-mute mt-1">{r.country}</div>
+              <p className="text-sm t-soft mt-3 leading-relaxed">{r.what_it_offers}</p>
+              <div className="mt-3 text-xs t-mute">
+                <span className="font-semibold text-amber-200/80">Eligibility · </span>{r.eligibility}
               </div>
-              <div className="mt-2 text-xs text-emerald-700">
+              <div className="mt-2 text-xs text-emerald-300/90">
                 <span className="font-semibold">Why it fits · </span>{r.why_relevant}
               </div>
             </motion.a>
@@ -61,18 +64,18 @@ export default function Step4Support({ domain, resources, loading, onNext, onBac
         </div>
       )}
 
-      <div className="mt-8 flex items-center justify-between">
-        <button onClick={onBack} className="bubble-btn bubble-btn-ghost inline-flex items-center gap-2" data-testid="back-btn">
+      <div className="mt-10 flex items-center justify-between flex-wrap gap-3">
+        <button onClick={onBack} className="lux-btn lux-btn-ghost" data-testid="back-btn">
           <ArrowLeft size={16} /> Back
         </button>
         <button
           onClick={onNext}
           disabled={loading}
-          className="bubble-btn bubble-btn-primary inline-flex items-center gap-2 disabled:opacity-60"
+          className="lux-btn lux-btn-primary"
           data-testid="generate-verdict-btn"
         >
-          {loading ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}
-          {loading ? "Building verdict..." : "Generate final verdict"}
+          {loading ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} className="relative z-10" />}
+          <span className="relative z-10">{loading ? "Building verdict…" : "Generate final verdict"}</span>
         </button>
       </div>
     </div>

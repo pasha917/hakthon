@@ -1,48 +1,144 @@
-.App { min-height: 100vh; position: relative; }
+.App { min-height: 100vh; position: relative; z-index: 0; }
 
+/* ---------- Glassmorphic surfaces (dark luxury) ---------- */
 .glass {
-    background: rgba(255, 255, 255, 0.62);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255,255,255,0.7);
-    box-shadow: 0 8px 32px rgba(30,27,75,0.06);
+    position: relative;
+    background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+    backdrop-filter: blur(22px) saturate(140%);
+    -webkit-backdrop-filter: blur(22px) saturate(140%);
+    border: 1px solid rgba(255,255,255,0.07);
+    box-shadow:
+        0 18px 50px rgba(0,0,0,0.45),
+        inset 0 1px 0 rgba(255,255,255,0.05);
+    border-radius: 1.5rem;
+    color: var(--ink);
 }
 .glass-heavy {
-    background: rgba(255, 255, 255, 0.82);
-    backdrop-filter: blur(28px);
-    -webkit-backdrop-filter: blur(28px);
-    border: 1px solid rgba(255,255,255,0.85);
-    box-shadow: 0 12px 40px rgba(30,27,75,0.08);
+    position: relative;
+    background: linear-gradient(135deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
+    backdrop-filter: blur(28px) saturate(150%);
+    -webkit-backdrop-filter: blur(28px) saturate(150%);
+    border: 1px solid rgba(230,200,112,0.18);
+    box-shadow:
+        0 24px 60px rgba(0,0,0,0.55),
+        inset 0 1px 0 rgba(255,255,255,0.07);
+    border-radius: 1.75rem;
+    color: var(--ink);
 }
 
-.bubble-btn {
-    border-radius: 9999px;
-    padding: 0.9rem 1.75rem;
-    font-weight: 600;
-    transition: transform .2s ease, box-shadow .2s ease, background-color .2s ease;
-}
-.bubble-btn-primary {
-    background: linear-gradient(130deg, #6366F1, #F43F5E);
-    color: white;
-    box-shadow: 0 10px 30px rgba(99,102,241,0.35);
-}
-.bubble-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 16px 36px rgba(99,102,241,0.45); }
-.bubble-btn-ghost {
-    background: rgba(255,255,255,.7);
-    color: #1E1B4B;
-    border: 1px solid rgba(99,102,241,.2);
-}
-.bubble-btn-ghost:hover { background: rgba(255,255,255,.9); }
+/* Text helpers */
+.t-mute  { color: var(--ink-mute); }
+.t-soft  { color: var(--ink-soft); }
+.t-gold  { color: var(--gold); }
 
 .chip {
-    display: inline-flex; align-items: center; gap: .4rem;
-    background: rgba(99,102,241,0.08);
-    color: #4338CA;
+    display: inline-flex; align-items: center; gap: .45rem;
+    background: rgba(230,200,112,0.10);
+    color: var(--gold);
+    border: 1px solid rgba(230,200,112,0.18);
     border-radius: 9999px;
-    padding: .35rem .8rem;
-    font-size: .78rem; font-weight: 600;
+    padding: .35rem .9rem;
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+}
+.chip-soft {
+    background: rgba(255,255,255,0.04);
+    color: var(--ink-soft);
+    border: 1px solid var(--line);
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 600;
+    font-size: .78rem;
 }
 
-/* Hide scrollbar for horizontal scroll sections */
+/* ---------- Shiny luxury button ---------- */
+.lux-btn {
+    position: relative;
+    display: inline-flex; align-items: center; justify-content: center;
+    gap: .55rem;
+    padding: 0.95rem 1.9rem;
+    border-radius: 9999px;
+    font-weight: 600;
+    letter-spacing: .01em;
+    transition: transform .25s ease, box-shadow .25s ease, filter .25s ease;
+    overflow: hidden;
+    isolation: isolate;
+    cursor: pointer;
+    user-select: none;
+    will-change: transform;
+}
+.lux-btn:disabled { opacity: .55; cursor: not-allowed; }
+.lux-btn::before {
+    content: "";
+    position: absolute; inset: 0;
+    background: linear-gradient(110deg,
+        transparent 20%,
+        rgba(255,255,255,0.45) 45%,
+        rgba(255,255,255,0.0)  60%);
+    transform: translateX(-120%) skewX(-20deg);
+    animation: shineSweep 3.5s infinite;
+    pointer-events: none;
+    mix-blend-mode: screen;
+    z-index: 1;
+}
+
+.lux-btn-primary {
+    color: #0B0B12;
+    background:
+        radial-gradient(120% 200% at 0% 0%, #FFE7B0 0%, #E6C870 35%, #B68A3A 75%, #6B4C19 100%);
+    border: 1px solid rgba(255,229,160,0.55);
+    box-shadow:
+        0 14px 38px rgba(230,200,112,0.32),
+        0 1px 0 rgba(255,255,255,0.45) inset,
+        0 -8px 22px rgba(0,0,0,0.35) inset;
+}
+.lux-btn-primary:hover { transform: translateY(-2px); filter: brightness(1.07); }
+.lux-btn-primary:active { transform: translateY(0); }
+
+.lux-btn-ghost {
+    color: var(--ink);
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.10);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.35) inset;
+}
+.lux-btn-ghost:hover { background: rgba(255,255,255,0.08); }
+.lux-btn-ghost::before { display: none; }
+
+/* Magnetic dark CTA - alternative, jewel violet */
+.lux-btn-violet {
+    color: #fff;
+    background: radial-gradient(120% 200% at 0% 0%, #C4B5FD 0%, #8B5CF6 40%, #5B21B6 80%);
+    border: 1px solid rgba(167,139,250,0.55);
+    box-shadow:
+        0 14px 38px rgba(139,92,246,0.45),
+        0 1px 0 rgba(255,255,255,0.25) inset;
+}
+.lux-btn-violet:hover { transform: translateY(-2px); filter: brightness(1.06); }
+
+/* Section divider hairline */
+.hairline {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(230,200,112,0.5), transparent);
+}
+
+/* Card hover lift */
+.lift { transition: transform .3s ease, box-shadow .3s ease, border-color .3s ease; }
+.lift:hover { transform: translateY(-4px); }
+
+/* No scrollbar utility */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Form field on dark */
+.field {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.10);
+    color: var(--ink);
+    border-radius: 1.25rem;
+    transition: border-color .2s, box-shadow .2s;
+}
+.field:focus-within { border-color: rgba(230,200,112,0.45); box-shadow: 0 0 0 4px rgba(230,200,112,0.10); }
+.field textarea, .field input { color: var(--ink); }
+.field textarea::placeholder, .field input::placeholder { color: rgba(244,239,226,0.30); }

@@ -37,10 +37,10 @@ export default function SpeechButton({ onTranscript, listening, setListening }) 
       onClick={toggle}
       type="button"
       data-testid="dictate-btn"
-      className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+      className={`w-12 h-12 rounded-full flex items-center justify-center transition-all border ${
         listening
-          ? "bg-rose-500 text-white shadow-[0_0_0_8px_rgba(244,63,94,0.15)]"
-          : "bg-white text-indigo-700 border border-indigo-100 hover:bg-indigo-50"
+          ? "bg-rose-500 text-white shadow-[0_0_0_8px_rgba(244,63,94,0.15)] border-rose-400"
+          : "bg-white/5 text-amber-200 border-white/10 hover:bg-white/10"
       }`}
       aria-label="Dictate"
     >

@@ -50,17 +50,14 @@ function speak(text) {
 export default function VoiceOrb() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([
-    { role: "bot", text: "Hi! I'm Bubble, your startup co-pilot. Tap the mic or type to talk." },
+    { role: "bot", text: "Hi, I'm Bubble — your startup atelier co-pilot. Tap the mic or type to talk." },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const rec = useSpeechRecognition();
   const scrollRef = useRef(null);
 
-  useEffect(() => {
-    if (rec.transcript) setInput(rec.transcript);
-  }, [rec.transcript]);
-
+  useEffect(() => { if (rec.transcript) setInput(rec.transcript); }, [rec.transcript]);
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, loading]);
@@ -79,9 +76,7 @@ export default function VoiceOrb() {
       speak(reply);
     } catch (e) {
       toast.error("Voice chat failed. Try again.");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const toggleMic = () => {
@@ -100,12 +95,14 @@ export default function VoiceOrb() {
         whileTap={{ scale: 0.92 }}
         className="fixed bottom-6 right-6 z-40 w-16 h-16 md:w-20 md:h-20 rounded-full text-white flex items-center justify-center"
         style={{
-          background: "linear-gradient(135deg,#6366F1,#F43F5E)",
-          boxShadow: "0 0 40px rgba(99,102,241,0.55)",
+          background: "radial-gradient(circle at 30% 25%, #FFE5A4 0%, #E6C870 35%, #B68A3A 70%, #4B2E0B 100%)",
+          boxShadow: "0 0 60px rgba(230,200,112,0.55), inset 0 1px 0 rgba(255,255,255,0.3)",
+          border: "1px solid rgba(255,229,160,0.45)",
+          color: "#1a1208",
         }}
         aria-label="Open voice assistant"
       >
-        <span className="absolute inset-0 rounded-full pulse-ring" style={{ background: "rgba(99,102,241,.35)" }} />
+        <span className="absolute inset-0 rounded-full pulse-ring" style={{ background: "rgba(230,200,112,0.45)" }} />
         <Mic className="relative" size={26} />
       </motion.button>
 
@@ -116,18 +113,18 @@ export default function VoiceOrb() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 30, scale: 0.95 }}
             transition={{ type: "spring", stiffness: 240, damping: 22 }}
-            className="fixed bottom-28 right-6 z-40 w-[min(92vw,380px)] h-[520px] glass-heavy rounded-3xl flex flex-col overflow-hidden"
+            className="fixed bottom-28 right-6 z-40 w-[min(92vw,400px)] h-[540px] glass-heavy flex flex-col overflow-hidden"
             data-testid="voice-panel"
           >
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/60">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
               <div className="flex items-center gap-2">
-                <Sparkles size={18} className="text-indigo-600" />
-                <span className="font-display font-bold text-indigo-900">Bubble</span>
+                <Sparkles size={18} className="text-amber-200" />
+                <span className="font-display font-semibold text-white">Bubble</span>
                 <span className="chip">AI Mentor</span>
               </div>
               <button
                 onClick={() => setOpen(false)}
-                className="p-2 rounded-full hover:bg-white/70"
+                className="p-2 rounded-full hover:bg-white/5 text-white/70"
                 data-testid="voice-panel-close"
                 aria-label="Close"
               >
@@ -141,8 +138,8 @@ export default function VoiceOrb() {
                   <div
                     className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
                       m.role === "user"
-                        ? "bg-indigo-600 text-white rounded-br-sm"
-                        : "bg-white/85 text-indigo-900 rounded-bl-sm border border-white"
+                        ? "bg-amber-300/15 text-amber-100 border border-amber-300/25 rounded-br-sm"
+                        : "bg-white/5 text-white/85 border border-white/10 rounded-bl-sm"
                     }`}
                   >
                     {m.text}
@@ -151,20 +148,22 @@ export default function VoiceOrb() {
               ))}
               {loading && (
                 <div className="flex justify-start">
-                  <div className="bg-white/85 rounded-2xl px-4 py-3 flex gap-1 border border-white">
-                    <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" />
-                    <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: "120ms" }} />
-                    <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: "240ms" }} />
+                  <div className="bg-white/5 border border-white/10 rounded-2xl px-4 py-3 flex gap-1">
+                    <span className="w-2 h-2 rounded-full bg-amber-300 animate-bounce" />
+                    <span className="w-2 h-2 rounded-full bg-amber-300 animate-bounce" style={{ animationDelay: "120ms" }} />
+                    <span className="w-2 h-2 rounded-full bg-amber-300 animate-bounce" style={{ animationDelay: "240ms" }} />
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="border-t border-white/60 p-3 flex items-center gap-2">
+            <div className="border-t border-white/10 p-3 flex items-center gap-2">
               <button
                 onClick={toggleMic}
-                className={`w-11 h-11 rounded-full flex items-center justify-center transition-all ${
-                  rec.listening ? "bg-rose-500 text-white shadow-lg" : "bg-white/80 text-indigo-700 border border-indigo-100"
+                className={`w-11 h-11 rounded-full flex items-center justify-center transition-all border ${
+                  rec.listening
+                    ? "bg-rose-500 text-white shadow-lg border-rose-400"
+                    : "bg-white/5 text-amber-200 border-white/10 hover:bg-white/10"
                 }`}
                 data-testid="voice-mic-toggle"
                 aria-label="Toggle microphone"
@@ -176,13 +175,14 @@ export default function VoiceOrb() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && send()}
-                placeholder={rec.listening ? "Listening..." : "Ask anything..."}
-                className="flex-1 rounded-full bg-white/80 border border-white px-4 py-2.5 text-sm outline-none focus:ring-4 focus:ring-indigo-500/20"
+                placeholder={rec.listening ? "Listening…" : "Ask anything…"}
+                className="flex-1 rounded-full bg-white/5 border border-white/10 px-4 py-2.5 text-sm outline-none focus:border-amber-300/50 text-white placeholder:text-white/30"
               />
               <button
                 onClick={send}
                 disabled={loading || !input.trim()}
-                className="w-11 h-11 rounded-full bg-indigo-600 text-white flex items-center justify-center disabled:opacity-50"
+                className="w-11 h-11 rounded-full text-black flex items-center justify-center disabled:opacity-50"
+                style={{ background: "radial-gradient(circle at 30% 25%, #FFE5A4, #E6C870 60%, #B68A3A 100%)" }}
                 data-testid="voice-send"
                 aria-label="Send"
               >

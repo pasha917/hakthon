@@ -126,16 +126,18 @@ export default function Wizard() {
 
   return (
     <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-8 md:py-12">
-      <header className="flex items-center justify-between mb-8">
+      <header className="flex items-center justify-between mb-10">
         <div className="flex items-center gap-3" data-testid="brand">
-          <div className="w-10 h-10 rounded-full" style={{ background: "linear-gradient(135deg,#6366F1,#F43F5E)" }} />
+          <div className="relative w-11 h-11 rounded-full" style={{ background: "radial-gradient(circle at 30% 30%, #FFE5A4, #E6C870 35%, #6B4C19 90%)", boxShadow: "0 0 24px rgba(230,200,112,0.45)" }}>
+            <div className="absolute inset-1 rounded-full border border-amber-200/30" />
+          </div>
           <div>
-            <div className="font-display font-extrabold text-xl text-indigo-950 leading-none">BubblePilot</div>
-            <div className="text-xs text-indigo-700/70">AI Startup Advisor</div>
+            <div className="font-display font-bold text-xl text-white leading-none tracking-tight">BubblePilot</div>
+            <div className="text-[10px] tracking-[0.25em] uppercase text-amber-200/70 mt-1">AI Startup Atelier</div>
           </div>
         </div>
         {step > 1 && (
-          <button onClick={restart} className="bubble-btn bubble-btn-ghost text-sm" data-testid="restart-btn">
+          <button onClick={restart} className="lux-btn lux-btn-ghost text-sm py-2 px-4" data-testid="restart-btn">
             Start over
           </button>
         )}
