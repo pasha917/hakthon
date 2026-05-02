@@ -8,6 +8,7 @@ import Step2Problems from "@/pages/steps/Step2Problems";
 import Step3Analysis from "@/pages/steps/Step3Analysis";
 import Step4Support from "@/pages/steps/Step4Support";
 import Step5Verdict from "@/pages/steps/Step5Verdict";
+import VoiceCallModal, { VoiceCallButton } from "@/components/VoiceCallModal";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -21,6 +22,7 @@ const pageAnim = {
 export default function Wizard() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [voiceCallOpen, setVoiceCallOpen] = useState(false);
   const [state, setState] = useState({
     sessionId: null,
     idea: "",
@@ -136,18 +138,21 @@ export default function Wizard() {
             <div className="text-[10px] tracking-[0.25em] uppercase text-amber-200/70 mt-1">AI Startup Atelier</div>
           </div>
         </div>
-        {step > 1 && (
-          <button onClick={restart} className="lux-btn lux-btn-ghost text-sm py-2 px-4" data-testid="restart-btn">
-            Start over
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          <VoiceCallButton onOpen={() => setVoiceCallOpen(true)} className="text-sm py-2 px-4" />
+          {step > 1 && (
+            <button onClick={restart} className="lux-btn lux-btn-ghost text-sm py-2 px-4" data-testid="restart-btn">
+              Start over
+            </button>
+          )}
+        </div>
       </header>
 
       <StepProgress current={step} />
 
       <AnimatePresence mode="wait">
         <motion.div key={step} {...pageAnim} data-testid={`step-view-${step}`}>
-          {step === 1 && <Step1Idea onSubmit={submitIdea} loading={loading} initial={state.idea} />}
+          {step === 1 && <Step1Idea onSubmit={submitIdea} loading={loading} initial={state.idea} onOpenVoiceCall={() => setVoiceCallOpen(true)} />}
           {step === 2 && (
             <Step2Problems
               domain={state.domain} whyFit={state.whyFit} tags={state.tags}
@@ -184,6 +189,12 @@ export default function Wizard() {
           )}
         </motion.div>
       </AnimatePresence>
+
+      <VoiceCallModal
+        open={voiceCallOpen}
+        onClose={() => setVoiceCallOpen(false)}
+        sessionId={state.sessionId || (typeof window !== "undefined" ? localStorage.getItem("advisor_session_id") : null)}
+      />
     </div>
   );
 }

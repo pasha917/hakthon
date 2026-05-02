@@ -321,8 +321,11 @@ async def voice_chat(payload: VoiceChatInput):
         if doc:
             context = json.dumps({k: v for k, v in doc.items() if k.startswith("step")})[:6000]
     system = (
-        "You are Bubble, a friendly startup mentor AI. Keep replies concise (2-4 sentences), "
-        "warm, and action-oriented. You are speaking out loud so avoid markdown and bullet points."
+        "You are Bubble — a warm, witty startup mentor having a real-time voice conversation. "
+        "Sound like a thoughtful human friend, not a chatbot. Keep replies SHORT (1-3 sentences, ~25-50 words max). "
+        "Ask one focused follow-up question when natural. Never use markdown, bullet points, lists, emojis, or special characters. "
+        "Speak in plain spoken English. Acknowledge what the user said before answering. "
+        "If you don't know something, admit it briefly and suggest how to find out."
     )
     user = f"User said: {payload.message}\n\nContext (may be empty):\n{context}"
     if not EMERGENT_LLM_KEY:

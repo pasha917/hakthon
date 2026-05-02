@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, ArrowRight, Loader2 } from "lucide-react";
+import { Sparkles, ArrowRight, Loader2, Phone } from "lucide-react";
 import SpeechButton from "@/components/SpeechButton";
 import RevealText from "@/components/RevealText";
 
@@ -10,7 +10,7 @@ const SAMPLES = [
   "AI tutor that teaches coding through multiplayer bubble games",
 ];
 
-export default function Step1Idea({ onSubmit, loading, initial }) {
+export default function Step1Idea({ onSubmit, loading, initial, onOpenVoiceCall }) {
   const [idea, setIdea] = useState(initial || "");
   const [listening, setListening] = useState(false);
 
@@ -94,6 +94,15 @@ export default function Step1Idea({ onSubmit, loading, initial }) {
             {loading ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
             <span className="relative z-10">{loading ? "Brewing insights…" : "Reveal my dossier"}</span>
             {!loading && <ArrowRight size={18} className="relative z-10" />}
+          </button>
+          <button
+            onClick={onOpenVoiceCall}
+            type="button"
+            className="lux-btn lux-btn-violet"
+            data-testid="step1-voice-call-btn"
+          >
+            <Phone size={18} className="relative z-10" />
+            <span className="relative z-10">Talk to Bubble</span>
           </button>
           <span className="text-sm t-mute">Takes ~15 seconds</span>
         </motion.div>
