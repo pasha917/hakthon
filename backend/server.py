@@ -16,6 +16,7 @@ import uuid
 from datetime import datetime, timezone
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 from emergentintegrations.llm.openai import OpenAISpeechToText, OpenAITextToSpeech
+from auth import build_router as build_auth_router
 
 
 ROOT_DIR = Path(__file__).parent
@@ -617,7 +618,114 @@ List 5-7 channels.
     return {"session_id": payload.session_id, **data}
 
 
+# =============== INVESTOR COLD-EMAIL DRAFTER ===============
+class EmailDraftRequest(BaseModel):
+    session_id: str
+    investor_name: Optional[str] = "Investor"
+    fund_name: Optional[str] = "your fund"
+
+@api_router.post("/investor-emails")
+async def investor_emails(payload: EmailDraftRequest):
+    session = await _get_session(payload.session_id)
+    ctx = json.dumps({
+        "domain": ((session.get("step1") or {}).get("result") or {}).get("domain"),
+        "refined_idea": (session.get("step3") or {}).get("refined_idea"),
+        "analysis": (session.get("step3") or {}).get("result"),
+        "verdict": (session.get("step5") or {}).get("result"),
+    })[:4500]
+    system = "You are a YC-grade founder copywriter. Return STRICT valid JSON only."
+    user = f"""
+Context: {ctx}
+Investor: {payload.investor_name} at {payload.fund_name}.
+
+Write 3 short cold investor emails (max 110 words each, plain text, no markdown). Different angles. JSON schema:
+{{
+  "emails": [
+    {{"angle":"Direct Pitch","subject":"...","body":"..."}},
+    {{"angle":"Warm Intro Ask","subject":"...","body":"..."}},
+    {{"angle":"Curiosity Hook","subject":"...","body":"..."}}
+  ]
+}}
+End each body with one specific call-to-action. Keep authentic, not salesy.
+"""
+    data = await _llm_json(system, user, payload.session_id, model="claude-haiku-4-5-20251001")
+    return {"session_id": payload.session_id, **data}
+
+
+# =============== LEGAL & COMPLIANCE CHECKLIST ===============
+class LegalRequest(BaseModel):
+    session_id: str
+    country: Optional[str] = "India"
+
+@api_router.post("/legal-checklist")
+async def legal_checklist(payload: LegalRequest):
+    session = await _get_session(payload.session_id)
+    ctx = json.dumps({
+        "domain": ((session.get("step1") or {}).get("result") or {}).get("domain"),
+        "refined_idea": (session.get("step3") or {}).get("refined_idea"),
+    })[:3000]
+    system = "You are a startup-savvy lawyer. Return STRICT valid JSON only."
+    user = f"""
+Context: {ctx}
+Founder country: {payload.country}
+
+Generate a practical legal checklist with REAL portal links where applicable. JSON schema:
+{{
+  "incorporation": [
+    {{"item":"...","why":"...","priority":"Critical|High|Medium","link":"https://..."}}
+  ],
+  "ip_protection": [{{"item":"...","why":"...","priority":"...","link":"..."}}],
+  "compliance": [{{"item":"...","why":"...","priority":"...","link":"..."}}],
+  "contracts_needed": ["NDA","Founders Agreement","Privacy Policy","ToS","Employment letters"],
+  "first_3_steps": ["sharp 3 actions to take this week"]
+}}
+List 3-5 items per category.
+"""
+    data = await _llm_json(system, user, payload.session_id, model="claude-haiku-4-5-20251001")
+    return {"session_id": payload.session_id, **data}
+
+
+# =============== CUSTOMER PERSONAS ===============
+class PersonaRequest(BaseModel):
+    session_id: str
+
+@api_router.post("/personas")
+async def personas(payload: PersonaRequest):
+    session = await _get_session(payload.session_id)
+    ctx = json.dumps({
+        "domain": ((session.get("step1") or {}).get("result") or {}).get("domain"),
+        "selected_problem": (session.get("step2") or {}).get("selected_problem"),
+        "refined_idea": (session.get("step3") or {}).get("refined_idea"),
+    })[:3500]
+    system = "You are a senior product researcher. Return STRICT valid JSON only."
+    user = f"""
+Context: {ctx}
+
+Create 3 vivid customer personas. JSON schema:
+{{
+  "personas": [
+    {{
+      "name":"First Last",
+      "role":"job title",
+      "age": int,
+      "location":"city, country",
+      "snapshot":"2-3 sentence story",
+      "goals":["3-4 goals"],
+      "pains":["3-4 pains"],
+      "channels_to_reach":["3 specific channels"],
+      "willingness_to_pay_usd": int,
+      "killer_quote":"1-line quote in their voice"
+    }}
+  ]
+}}
+Make them realistic and culturally specific to the domain.
+"""
+    data = await _llm_json(system, user, payload.session_id, model="claude-haiku-4-5-20251001")
+    return {"session_id": payload.session_id, **data}
+
+
 app.include_router(api_router)
+app.include_router(build_auth_router(db))
 
 app.add_middleware(
     CORSMiddleware,

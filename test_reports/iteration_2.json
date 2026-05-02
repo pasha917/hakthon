@@ -1,0 +1,46 @@
+{
+  "summary": "Backend-only regression + new-feature testing for BubblePilot. 22/22 pytest cases PASSED in 126s against the public REACT_APP_BACKEND_URL. Validated: JWT auth (signup/login/me/invalid-token/duplicate/wrong-password), forgot-password + verify-otp flows (SMTP correctly returns 502 BadCredentials as expected — NOT a code bug), 3 new AI endpoints (investor-emails, legal-checklist, personas) with full schema assertions, and regression of pitch-deck, tech-stack, marketing-plan, pitch-practice, tts (audio/mpeg), generate-logo (base64), and session persistence.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/auth/forgot-password", "issue": "Gmail SMTP credentials in /app/backend/.env are rejected by Google ('535 BadCredentials'). Backend correctly catches and returns 502 with detail — no crash. User must regenerate a Gmail App Password (16 chars) at https://myaccount.google.com/apppasswords and replace SMTP_PASS, then restart backend. Not a code bug."},
+      {"endpoint": "/api/auth/verify-otp", "issue": "OTP record in password_otps is upserted BEFORE email send, so if SMTP fails the user gets 502 from /forgot-password but a pending (unknown-to-user) OTP record still exists. Cosmetic — doesn't break anything. Consider rolling back the upsert on SMTP failure for cleanliness."},
+      {"endpoint": "/api/auth/*", "issue": "CORS middleware is registered AFTER app.include_router(...) in server.py (lines 727-736). Starlette evaluates middleware in reverse order of add_middleware calls, and routes match before middleware is applied only when the middleware stack is built at startup — in FastAPI this still works (tests pass with CORS headers present), but conventionally middleware should be added before routers. Low priority."},
+      {"endpoint": "/api/auth/login", "issue": "No brute-force lockout / rate-limit on login or forgot-password. Acceptable for MVP but worth tracking (playbook recommends lockout after 5 failed attempts)."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_auth_and_new_ai.py",
+    "/app/backend/tests/test_advisor_flow.py",
+    "/app/test_reports/pytest/iter2.xml"
+  ],
+  "action_items": [
+    "User action: regenerate Gmail App Password and paste into SMTP_PASS in /app/backend/.env, then `sudo supervisorctl restart backend`.",
+    "Optional: rollback password_otps upsert if send_otp_email raises (clean-up transactional consistency).",
+    "Optional: move CORSMiddleware registration above app.include_router(...) calls for conventional ordering.",
+    "Optional: add login rate-limit / lockout per playbook guidance."
+  ],
+  "critical_code_review_comments": [
+    "auth.py: bcrypt hashing uses bcrypt.gensalt() (default cost 12) and checkpw — correct. Hashes are stored as strings starting with $2b$ as required by playbook.",
+    "auth.py: JWT uses HS256 with JWT_SECRET from env (fails fast if missing) — good. 7-day TTL is reasonable.",
+    "auth.py: signup/login both normalise email via .lower().strip() — good; prevents duplicate accounts on case variants.",
+    "auth.py: _get_current_user correctly projects {'_id':0, 'password_hash':0} so password hashes never leak through /me.",
+    "auth.py: password_otps TTL index on expires_at is created in asyncio.get_event_loop().create_task(_ensure_indexes()) — works but deprecated; prefer FastAPI lifespan.",
+    "auth.py: OTP stored as bcrypt hash (not plaintext) — good security posture.",
+    "auth.py: verify-otp deletes record after 5 failed attempts (line 231) — reasonable attempt-limit.",
+    "server.py: CORS allow_credentials=True with allow_origins='*' is invalid per CORS spec and will be rejected by browsers when Access-Control-Allow-Origin='*' and credentials include; tighten origins in prod.",
+    "server.py: No auth guard on AI endpoints (/api/pitch-deck, /investor-emails, /legal-checklist, /personas, /generate-logo, etc.) — anyone with a session_id can call them. If auth-gating was part of the spec this is a gap; otherwise OK for the open-flow.",
+    "server.py: _get_session + _save_session correctly exclude _id; all LLM endpoints use {'_id':0} projections — ObjectId never leaks.",
+    "server.py: investor-emails, legal-checklist, personas all cap context with [:N000] truncation before LLM call — prevents token overflow. Good.",
+    "auth.py forgot-password: database state mutation (OTP upsert) happens before the unreliable external call (SMTP). Consider try/except rollback on SMTP failure."
+  ],
+  "updated_files": ["/app/backend/tests/test_auth_and_new_ai.py"],
+  "success_rate": {"backend": "100% (22/22)", "frontend": "not tested (backend-only per request)"},
+  "test_credentials": "demo@bubblepilot.app / demo1234 (verified working via login test). Signup tests generate fresh random emails to avoid 409 conflicts.",
+  "seed_data_creation": "Each run creates 1 fresh user via /api/auth/signup with random email test-<uuid>@bubblepilot.app. Uses pre-existing session_id 87310059-5f64-4a16-b593-c3f63118e8f7 for AI endpoints. No cleanup performed (test users are harmless small docs).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Two pytest suites now exist: /app/backend/tests/test_advisor_flow.py (5-step flow) and /app/backend/tests/test_auth_and_new_ai.py (auth + investor-emails/legal-checklist/personas + regression of pitch-deck/tech-stack/marketing-plan/pitch-practice/tts/generate-logo). Run with `pytest /app/backend/tests/ -v --tb=short`. LLM calls total ~2 min per suite. Gmail SMTP is expected to return 502 BadCredentials until user regenerates App Password — the test accepts both 200 and 502.",
+  "rca of the issue": "N/A — no bugs found. Only non-critical observation: Gmail SMTP credentials are invalid (user-action required, not a code fix). Mitigation: regenerate Gmail App Password at https://myaccount.google.com/apppasswords with 2FA enabled, paste the 16-char password (no spaces) as SMTP_PASS in /app/backend/.env, then `sudo supervisorctl restart backend`."
+}

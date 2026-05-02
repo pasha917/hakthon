@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
-import { ArrowLeft, Loader2, Sparkles, Wand2, FileText, Layers, Megaphone, Mic, Download } from "lucide-react";
+import { ArrowLeft, Loader2, Sparkles, Wand2, FileText, Layers, Megaphone, Mic, Download, Mail, Scale, Users } from "lucide-react";
 import { toast } from "sonner";
 import RevealText from "@/components/RevealText";
 
@@ -15,6 +15,9 @@ export default function Forge({ sessionId, brand, domain, onBack, onOpenPitchPra
     { id: "deck", label: "Pitch Deck", icon: <FileText size={16} /> },
     { id: "stack", label: "Tech Stack", icon: <Layers size={16} /> },
     { id: "marketing", label: "Marketing", icon: <Megaphone size={16} /> },
+    { id: "emails", label: "Investor Emails", icon: <Mail size={16} /> },
+    { id: "legal", label: "Legal Checklist", icon: <Scale size={16} /> },
+    { id: "personas", label: "Customer Personas", icon: <Users size={16} /> },
     { id: "pitch", label: "Pitch Practice", icon: <Mic size={16} /> },
   ];
 
@@ -47,6 +50,9 @@ export default function Forge({ sessionId, brand, domain, onBack, onOpenPitchPra
         {tab === "deck" && <PitchDeck sessionId={sessionId} brand={brand} />}
         {tab === "stack" && <TechStack sessionId={sessionId} />}
         {tab === "marketing" && <MarketingPlan sessionId={sessionId} />}
+        {tab === "emails" && <InvestorEmails sessionId={sessionId} />}
+        {tab === "legal" && <LegalChecklist sessionId={sessionId} />}
+        {tab === "personas" && <Personas sessionId={sessionId} />}
       </div>
 
       <div className="mt-10 flex">
@@ -376,6 +382,183 @@ function MarketingPlan({ sessionId }) {
         <button onClick={generate} className="lux-btn lux-btn-ghost text-sm py-2 px-4" data-testid="mkt-regen">
           <Wand2 size={14} /> Regenerate
         </button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- INVESTOR EMAILS ---------- */
+function InvestorEmails({ sessionId }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [investorName, setInvestorName] = useState("Investor");
+  const [fundName, setFundName] = useState("Sequoia");
+
+  const generate = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.post(`${API}/investor-emails`, { session_id: sessionId, investor_name: investorName, fund_name: fundName }, { timeout: 60000 });
+      setData(res.data);
+    } catch (e) { toast.error("Email drafting failed"); }
+    finally { setLoading(false); }
+  };
+  const copy = async (text) => { try { await navigator.clipboard.writeText(text); toast.success("Copied"); } catch (_) {} };
+
+  return (
+    <div data-testid="emails-view">
+      <div className="glass p-5 mb-5 grid sm:grid-cols-3 gap-3">
+        <Field label="Investor name"><input value={investorName} onChange={(e) => setInvestorName(e.target.value)} className="w-full bg-transparent outline-none text-white" data-testid="email-investor" /></Field>
+        <Field label="Fund / firm"><input value={fundName} onChange={(e) => setFundName(e.target.value)} className="w-full bg-transparent outline-none text-white" data-testid="email-fund" /></Field>
+        <div className="flex items-end">
+          <button onClick={generate} disabled={loading} className="lux-btn lux-btn-primary w-full" data-testid="generate-emails">
+            {loading ? <Loader2 className="animate-spin" size={18} /> : <Mail size={18} />}
+            <span className="relative z-10">{loading ? "Drafting…" : "Draft 3 emails"}</span>
+          </button>
+        </div>
+      </div>
+      {!data && !loading && <div className="glass p-8 t-soft text-center">3 cold-email angles will appear here — direct, warm-intro ask, and curiosity hook.</div>}
+      <div className="grid lg:grid-cols-3 gap-5">
+        {(data?.emails || []).map((e, i) => (
+          <div key={i} className="glass sheen p-5" data-testid={`email-${i}`}>
+            <div className="chip mb-3">{e.angle}</div>
+            <div className="text-[10px] tracking-[0.2em] uppercase font-bold t-mute">Subject</div>
+            <div className="font-display font-semibold text-white mb-3">{e.subject}</div>
+            <div className="text-[10px] tracking-[0.2em] uppercase font-bold t-mute">Body</div>
+            <pre className="whitespace-pre-wrap text-sm t-soft leading-relaxed mt-1">{e.body}</pre>
+            <button onClick={() => copy(`Subject: ${e.subject}\n\n${e.body}`)} className="chip-soft mt-4 hover:border-amber-300/40">Copy</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- LEGAL CHECKLIST ---------- */
+function LegalChecklist({ sessionId }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [country, setCountry] = useState("India");
+
+  const generate = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.post(`${API}/legal-checklist`, { session_id: sessionId, country }, { timeout: 60000 });
+      setData(res.data);
+    } catch (e) { toast.error("Legal checklist failed"); }
+    finally { setLoading(false); }
+  };
+
+  const Section = ({ title, items }) => (
+    <div className="glass p-5 mb-4">
+      <h4 className="font-display font-semibold text-xl text-white mb-3">{title}</h4>
+      <ul className="space-y-2">
+        {(items || []).map((it, i) => (
+          <li key={i} className="border-l-2 border-amber-300/40 pl-3">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-white">{it.item}</span>
+              <span className={`chip-soft ${it.priority === "Critical" ? "text-rose-300 border-rose-400/40" : it.priority === "High" ? "text-amber-200" : "text-white/60"}`}>{it.priority}</span>
+            </div>
+            <div className="text-sm t-soft">{it.why}</div>
+            {it.link && <a href={it.link} target="_blank" rel="noreferrer" className="text-xs text-amber-300 hover:text-amber-200">Open portal →</a>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+
+  return (
+    <div data-testid="legal-view">
+      <div className="glass p-5 mb-5 grid sm:grid-cols-3 gap-3">
+        <Field label="Country"><input value={country} onChange={(e) => setCountry(e.target.value)} className="w-full bg-transparent outline-none text-white" data-testid="legal-country" /></Field>
+        <div className="sm:col-span-2 flex items-end">
+          <button onClick={generate} disabled={loading} className="lux-btn lux-btn-primary w-full" data-testid="generate-legal">
+            {loading ? <Loader2 className="animate-spin" size={18} /> : <Scale size={18} />}
+            <span className="relative z-10">{loading ? "Drafting…" : "Generate legal checklist"}</span>
+          </button>
+        </div>
+      </div>
+      {!data && !loading && <div className="glass p-8 t-soft text-center">Incorporation, IP, compliance and contracts — country-specific.</div>}
+      {data && (
+        <>
+          <Section title="Incorporation" items={data.incorporation} />
+          <Section title="IP Protection" items={data.ip_protection} />
+          <Section title="Compliance" items={data.compliance} />
+          {data.contracts_needed?.length > 0 && (
+            <div className="glass p-5 mb-4">
+              <h4 className="font-display font-semibold text-xl text-white mb-3">Contracts to draft</h4>
+              <div className="flex flex-wrap gap-2">{data.contracts_needed.map((c, i) => <span key={i} className="chip-soft">{c}</span>)}</div>
+            </div>
+          )}
+          {data.first_3_steps?.length > 0 && (
+            <div className="glass-heavy p-5">
+              <h4 className="font-display font-semibold text-xl text-white mb-3">First 3 steps this week</h4>
+              <ol className="space-y-2">
+                {data.first_3_steps.map((s, i) => <li key={i} className="flex gap-3 t-soft"><span className="w-6 h-6 rounded-full bg-amber-300/15 text-amber-200 text-xs flex items-center justify-center font-bold">{i + 1}</span>{s}</li>)}
+              </ol>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ---------- CUSTOMER PERSONAS ---------- */
+function Personas({ sessionId }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const generate = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.post(`${API}/personas`, { session_id: sessionId }, { timeout: 60000 });
+      setData(res.data);
+    } catch (e) { toast.error("Persona generation failed"); }
+    finally { setLoading(false); }
+  };
+
+  if (!data) {
+    return (
+      <div className="glass p-10 text-center" data-testid="personas-empty">
+        <h3 className="font-display font-semibold text-2xl text-white mb-2">Vivid customer personas</h3>
+        <p className="t-soft mb-6 max-w-xl mx-auto">3 culturally-specific people with goals, pains, channels, willingness to pay, and a killer quote.</p>
+        <button onClick={generate} disabled={loading} className="lux-btn lux-btn-primary" data-testid="generate-personas">
+          {loading ? <Loader2 className="animate-spin" size={18} /> : <Users size={18} />}
+          <span className="relative z-10">{loading ? "Sketching…" : "Generate personas"}</span>
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="grid md:grid-cols-3 gap-5" data-testid="personas-view">
+      {(data.personas || []).map((p, i) => (
+        <div key={i} className="glass sheen p-6 lift" data-testid={`persona-${i}`}>
+          <div className="chip mb-3">{p.role}</div>
+          <div className="font-display font-bold text-2xl text-white">{p.name}</div>
+          <div className="text-xs t-mute mt-1">{p.age} · {p.location}</div>
+          <p className="t-soft text-sm mt-3 italic">"{p.killer_quote}"</p>
+          <p className="t-soft text-sm mt-3">{p.snapshot}</p>
+          <div className="mt-4">
+            <div className="text-[10px] tracking-[0.2em] uppercase font-bold t-mute">Goals</div>
+            <ul className="text-sm t-soft mt-1 space-y-0.5">{(p.goals || []).map((g, j) => <li key={j}>• {g}</li>)}</ul>
+          </div>
+          <div className="mt-3">
+            <div className="text-[10px] tracking-[0.2em] uppercase font-bold t-mute">Pains</div>
+            <ul className="text-sm t-soft mt-1 space-y-0.5">{(p.pains || []).map((g, j) => <li key={j}>• {g}</li>)}</ul>
+          </div>
+          <div className="mt-3 flex items-center justify-between">
+            <div>
+              <div className="text-[10px] tracking-[0.2em] uppercase font-bold t-mute">Reach via</div>
+              <div className="text-sm t-soft">{(p.channels_to_reach || []).join(" · ")}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-[10px] tracking-[0.2em] uppercase font-bold t-mute">WTP / mo</div>
+              <div className="font-display font-bold text-amber-200 text-xl">${p.willingness_to_pay_usd}</div>
+            </div>
+          </div>
+        </div>
+      ))}
+      <div className="md:col-span-3 mt-2">
+        <button onClick={generate} className="lux-btn lux-btn-ghost text-sm py-2 px-4" data-testid="personas-regen"><Wand2 size={14} /> Regenerate</button>
       </div>
     </div>
   );

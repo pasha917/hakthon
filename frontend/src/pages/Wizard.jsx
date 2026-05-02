@@ -10,6 +10,8 @@ import Step4Support from "@/pages/steps/Step4Support";
 import Step5Verdict from "@/pages/steps/Step5Verdict";
 import Forge from "@/pages/Forge";
 import VoiceCallModal, { VoiceCallButton } from "@/components/VoiceCallModal";
+import { useAuth } from "@/context/AuthContext";
+import { LogOut, User as UserIcon } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -21,6 +23,7 @@ const pageAnim = {
 };
 
 export default function Wizard() {
+  const auth = useAuth();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [voiceCallOpen, setVoiceCallOpen] = useState(false);
@@ -46,9 +49,10 @@ export default function Wizard() {
 
   const go = (n) => setStep(n);
 
-  // Step 1 -> 2
+  // Step 1 -> 2 (gated behind auth)
   const submitIdea = async (idea) => {
     if (!idea.trim()) { toast.error("Tell me your idea first"); return; }
+    if (!auth.user) { auth.openLogin(); return; }
     setLoading(true);
     try {
       const res = await axios.post(`${API}/analyze-idea`, { idea, session_id: state.sessionId });
@@ -142,6 +146,23 @@ export default function Wizard() {
         </div>
         <div className="flex items-center gap-3">
           <VoiceCallButton onOpen={() => setVoiceCallOpen(true)} className="text-sm py-2 px-4" />
+          {auth.ready && (
+            auth.user ? (
+              <div className="flex items-center gap-2" data-testid="user-pill">
+                <div className="hidden sm:flex items-center gap-2 chip-soft px-3 py-2">
+                  <UserIcon size={14} className="text-amber-300" />
+                  <span className="text-sm">{auth.user.name || auth.user.email}</span>
+                </div>
+                <button onClick={auth.logout} className="lux-btn lux-btn-ghost text-sm py-2 px-4" data-testid="logout-btn" title="Sign out">
+                  <LogOut size={14} />
+                </button>
+              </div>
+            ) : (
+              <button onClick={auth.openLogin} className="lux-btn lux-btn-ghost text-sm py-2 px-4" data-testid="open-login-btn">
+                Sign in
+              </button>
+            )
+          )}
           {step > 1 && (
             <button onClick={restart} className="lux-btn lux-btn-ghost text-sm py-2 px-4" data-testid="restart-btn">
               Start over
