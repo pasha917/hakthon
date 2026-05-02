@@ -729,6 +729,247 @@ Make them realistic and culturally specific to the domain.
     return {"session_id": payload.session_id, **data}
 
 
+# ====================================================================
+# VALIDATION LAB — 10 data-driven validation endpoints
+# ====================================================================
+
+def _ctx_for(session: dict, max_chars: int = 4500) -> str:
+    return json.dumps({
+        "domain": ((session.get("step1") or {}).get("result") or {}).get("domain"),
+        "selected_problem": (session.get("step2") or {}).get("selected_problem"),
+        "refined_idea": (session.get("step3") or {}).get("refined_idea"),
+        "analysis": (session.get("step3") or {}).get("result"),
+        "verdict": (session.get("step5") or {}).get("result"),
+    })[:max_chars]
+
+
+class ValBase(BaseModel):
+    session_id: str
+
+
+@api_router.post("/validation/market-sizing")
+async def market_sizing(payload: ValBase):
+    s = await _get_session(payload.session_id)
+    user = f"""
+Context: {_ctx_for(s)}
+
+Compute realistic TAM / SAM / SOM with backing assumptions.
+Return JSON:
+{{
+  "tam":{{"value_usd": int,"basis":"1-line"}},
+  "sam":{{"value_usd": int,"basis":"..."}},
+  "som_year_3":{{"value_usd": int,"basis":"..."}},
+  "growth_rate_pct": int,
+  "key_assumptions":["3-5 bullets"],
+  "data_sources":["3 reputable sources"]
+}}
+"""
+    return {"session_id": payload.session_id, **(await _llm_json("Market analyst. JSON only.", user, payload.session_id, model="claude-haiku-4-5-20251001"))}
+
+
+@api_router.post("/validation/competitor-matrix")
+async def competitor_matrix(payload: ValBase):
+    s = await _get_session(payload.session_id)
+    user = f"""
+Context: {_ctx_for(s)}
+
+Build a benchmarking matrix vs 4 real competitors on 6 axes (1-5 each).
+Axes: Product Quality, Pricing, UX, Distribution, Brand Strength, Innovation.
+Return JSON:
+{{
+  "competitors":[
+    {{"name":"...","url":"https://...","summary":"1 line",
+      "scores":{{"Product Quality":1-5,"Pricing":1-5,"UX":1-5,"Distribution":1-5,"Brand Strength":1-5,"Innovation":1-5}},
+      "strengths":["..."],"weaknesses":["..."]}}
+  ],
+  "your_advantage":["3 specific edges"],
+  "saturation_score": 0-100,
+  "verdict":"1-2 sentences"
+}}
+Exactly 4 competitors.
+"""
+    return {"session_id": payload.session_id, **(await _llm_json("Competitive analyst. JSON only.", user, payload.session_id, model="claude-haiku-4-5-20251001"))}
+
+
+@api_router.post("/validation/survey")
+async def validation_survey(payload: ValBase):
+    s = await _get_session(payload.session_id)
+    user = f"""
+Context: {_ctx_for(s)}
+
+Generate 12 customer-validation survey questions (Mom Test inspired — past behavior, not opinions).
+Return JSON:
+{{
+  "title":"...","intro":"...",
+  "questions":[
+    {{"n":1,"q":"...","type":"open|scale|multi","options":["if multi"],"why":"hypothesis tested"}}
+  ],
+  "target_responses": 30,
+  "distribution_channels":["3 specific places"]
+}}
+"""
+    return {"session_id": payload.session_id, **(await _llm_json("UX researcher. JSON only.", user, payload.session_id, model="claude-haiku-4-5-20251001"))}
+
+
+@api_router.post("/validation/landing-copy")
+async def landing_copy(payload: ValBase):
+    s = await _get_session(payload.session_id)
+    user = f"""
+Context: {_ctx_for(s)}
+
+Write a high-converting landing page in 3 hook variants.
+Return JSON:
+{{
+  "variants":[
+    {{"angle":"Pain-first|Outcome-first|Curiosity",
+      "headline":"max 10 words","subhead":"1 sentence",
+      "primary_cta":"3-4 words","social_proof":"1 line",
+      "feature_bullets":["3 bullets, 8 words max"],
+      "objection_buster":"1 sentence"}}
+  ],
+  "ab_test_hypothesis":"What you're testing"
+}}
+Exactly 3 variants.
+"""
+    return {"session_id": payload.session_id, **(await _llm_json("Conversion copywriter. JSON only.", user, payload.session_id, model="claude-haiku-4-5-20251001"))}
+
+
+@api_router.post("/validation/financials")
+async def financials(payload: ValBase):
+    s = await _get_session(payload.session_id)
+    user = f"""
+Context: {_ctx_for(s)}
+
+Build a realistic 5-year P&L. USD.
+Return JSON:
+{{
+  "years":[
+    {{"year":1,"revenue":int,"cogs":int,"gross_profit":int,"opex":int,"ebitda":int,"users":int,"arpu_usd":int}},
+    {{"year":2,...}},{{"year":3,...}},{{"year":4,...}},{{"year":5,...}}
+  ],
+  "break_even_month": int,
+  "cumulative_burn_usd": int,
+  "key_drivers":["3 sensitivity drivers"],
+  "unit_economics":{{"cac_usd":int,"ltv_usd":int,"payback_months":int}}
+}}
+"""
+    return {"session_id": payload.session_id, **(await _llm_json("Startup CFO. JSON only.", user, payload.session_id, model="claude-haiku-4-5-20251001"))}
+
+
+@api_router.post("/validation/pricing")
+async def pricing_strategy(payload: ValBase):
+    s = await _get_session(payload.session_id)
+    user = f"""
+Context: {_ctx_for(s)}
+
+Recommend a 3-tier pricing structure with reasoning.
+Return JSON:
+{{
+  "model":"freemium|usage|subscription|one-time",
+  "tiers":[
+    {{"name":"Free","price_usd":0,"target":"...","features":["3-5"],"limits":"..."}},
+    {{"name":"Pro","price_usd":int,"target":"...","features":["..."],"limits":"..."}},
+    {{"name":"Business","price_usd":int,"target":"...","features":["..."],"limits":"..."}}
+  ],
+  "anchor_competitor_pricing":[{{"name":"...","price_usd":int}}],
+  "expected_paid_conversion_pct": int,
+  "rationale":"3-4 sentences"
+}}
+"""
+    return {"session_id": payload.session_id, **(await _llm_json("Pricing strategist. JSON only.", user, payload.session_id, model="claude-haiku-4-5-20251001"))}
+
+
+@api_router.post("/validation/feature-priority")
+async def feature_priority(payload: ValBase):
+    s = await _get_session(payload.session_id)
+    user = f"""
+Context: {_ctx_for(s)}
+
+List 10 candidate MVP features with RICE scoring (Reach 1-100, Impact 1-3, Confidence 1-100, Effort weeks 1-12).
+Return JSON:
+{{
+  "features":[
+    {{"name":"...","reach":int,"impact":int,"confidence":int,"effort_weeks":int,"rice_score":number,"category":"Must|Should|Could|Wont","why":"1 line"}}
+  ]
+}}
+rice_score = (reach * impact * confidence/100) / effort_weeks. Sort desc. Exactly 10.
+"""
+    return {"session_id": payload.session_id, **(await _llm_json("Product manager. JSON only.", user, payload.session_id, model="claude-haiku-4-5-20251001"))}
+
+
+@api_router.post("/validation/risk-heatmap")
+async def risk_heatmap(payload: ValBase):
+    s = await _get_session(payload.session_id)
+    user = f"""
+Context: {_ctx_for(s)}
+
+Identify 8 specific risks with likelihood × impact scoring.
+Return JSON:
+{{
+  "risks":[
+    {{"name":"...","category":"Market|Tech|Team|Finance|Legal|Ops","likelihood":1-5,"impact":1-5,"severity":number,"early_signals":"1 line","mitigation":"1-2 sentences"}}
+  ]
+}}
+severity = likelihood * impact. Exactly 8. Sort desc.
+"""
+    return {"session_id": payload.session_id, **(await _llm_json("Risk analyst. JSON only.", user, payload.session_id, model="claude-haiku-4-5-20251001"))}
+
+
+@api_router.post("/validation/investor-match")
+async def investor_match(payload: ValBase):
+    s = await _get_session(payload.session_id)
+    user = f"""
+Context: {_ctx_for(s)}
+
+Suggest 6 REAL investors / VC firms whose thesis matches.
+Mix global + India focused. Return JSON:
+{{
+  "investors":[
+    {{"name":"firm","type":"VC|Angel|Accelerator","stage":"Pre-seed|Seed|Series A",
+      "thesis":"1 line","why_match":"1-2 sentences",
+      "check_size_usd":"e.g. $250k - $2M",
+      "portfolio_examples":["2 relevant"],"outreach_tip":"1 sentence","url":"https://..."}}
+  ]
+}}
+Use only real, verifiable firms.
+"""
+    return {"session_id": payload.session_id, **(await _llm_json("VC analyst. JSON only.", user, payload.session_id, model="claude-haiku-4-5-20251001"))}
+
+
+@api_router.post("/validation/scorecard")
+async def validation_scorecard(payload: ValBase):
+    s = await _get_session(payload.session_id)
+    user = f"""
+Context: {_ctx_for(s, 6500)}
+
+Produce a 100-point Validation Scorecard with 8 categories scored 0-100.
+Return JSON:
+{{
+  "categories":[
+    {{"name":"Problem Severity","score":0-100,"insight":"1 line"}},
+    {{"name":"Market Size","score":0-100,"insight":"..."}},
+    {{"name":"Solution Novelty","score":0-100,"insight":"..."}},
+    {{"name":"Competitive Edge","score":0-100,"insight":"..."}},
+    {{"name":"Business Model","score":0-100,"insight":"..."}},
+    {{"name":"Founder Fit","score":0-100,"insight":"..."}},
+    {{"name":"Capital Efficiency","score":0-100,"insight":"..."}},
+    {{"name":"Timing","score":0-100,"insight":"..."}}
+  ],
+  "final_score":0-100,
+  "tier":"Diamond|Gold|Silver|Bronze|Re-validate",
+  "go_no_go":"GO|NO-GO|PIVOT",
+  "headline":"max 16 words",
+  "top_3_strengths":["..."],
+  "top_3_gaps":["..."],
+  "next_3_actions":["next 14 days"]
+}}
+final_score = average of category scores (rounded int).
+"""
+    data = await _llm_json("Senior YC partner. JSON only.", user, payload.session_id, model="claude-haiku-4-5-20251001")
+    await _save_session(payload.session_id, {"validation_scorecard": data})
+    return {"session_id": payload.session_id, **data}
+
+
 app.include_router(api_router)
 app.include_router(build_auth_router(db))
 

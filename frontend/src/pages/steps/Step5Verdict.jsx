@@ -28,7 +28,7 @@ const tooltipStyle = {
   labelStyle: { color: "#E6C870" },
 };
 
-export default function Step5Verdict({ verdict, idea, domain, onBack, onRestart, onForge }) {
+export default function Step5Verdict({ verdict, idea, domain, onBack, onRestart, onForge, onValidate }) {
   if (!verdict) {
     return (
       <div className="text-center py-20 t-soft" data-testid="verdict-empty">
@@ -214,6 +214,12 @@ export default function Step5Verdict({ verdict, idea, domain, onBack, onRestart,
           <button onClick={print} className="lux-btn lux-btn-ghost" data-testid="export-btn">
             <Download size={16} /> Export
           </button>
+          {onValidate && (
+            <button onClick={onValidate} className="lux-btn lux-btn-primary" data-testid="open-validation-lab-btn">
+              <Trophy size={16} className="relative z-10" />
+              <span className="relative z-10">Validation Lab →</span>
+            </button>
+          )}
           {onForge && (
             <button onClick={onForge} className="lux-btn lux-btn-violet" data-testid="open-forge-btn">
               <Rocket size={16} className="relative z-10" />

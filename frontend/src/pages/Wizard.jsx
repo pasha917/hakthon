@@ -9,6 +9,7 @@ import Step3Analysis from "@/pages/steps/Step3Analysis";
 import Step4Support from "@/pages/steps/Step4Support";
 import Step5Verdict from "@/pages/steps/Step5Verdict";
 import Forge from "@/pages/Forge";
+import ValidationLab from "@/pages/ValidationLab";
 import VoiceCallModal from "@/components/VoiceCallModal";
 import { useAuth } from "@/context/AuthContext";
 import { LogOut, User as UserIcon } from "lucide-react";
@@ -208,6 +209,7 @@ export default function Wizard() {
               onBack={() => go(4)}
               onRestart={restart}
               onForge={() => go(6)}
+              onValidate={() => go(7)}
             />
           )}
           {step === 6 && (
@@ -217,6 +219,13 @@ export default function Wizard() {
               domain={state.domain}
               onBack={() => go(5)}
               onOpenPitchPractice={() => { setVoiceMode("pitch"); setVoiceCallOpen(true); }}
+            />
+          )}
+          {step === 7 && (
+            <ValidationLab
+              sessionId={state.sessionId}
+              domain={state.domain}
+              onBack={() => go(5)}
             />
           )}
         </motion.div>
